@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Laboratorio de Juegos · Matemáticas Discretas</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-deep: #0b0f1c;
+            --bg-card: #11172b;
+            --neon-cyan: #00f0ff;
+            --neon-purple: #b967ff;
+            --neon-pink: #ff44cc;
+            --gold: #ffcf40;
+            --green-mint: #2effb0;
+            --text-light: #eef5ff;
+            --text-dim: #8ea3c2;
+            --border-glow: rgba(0, 240, 255, 0.3);
+        }
+
+        body {
+            background: radial-gradient(circle at 10% 20%, #0a0e1a, #03060c);
+            font-family: 'Space Grotesk', sans-serif;
+            color: var(--text-light);
+            line-height: 1.5;
+            scroll-behavior: smooth;
+        }
+
+        /* contenedor principal */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* header */
+        .hero {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        .hero h1 {
+            font-size: 2.8rem;
+            background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.5px;
+            font-weight: 700;
+        }
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-dim);
+            max-width: 700px;
+            margin: 0.8rem auto 0;
+        }
+        .badge-lab {
+            display: inline-block;
+            background: rgba(0, 240, 255, 0.12);
+            border: 1px solid var(--neon-cyan);
+            border-radius: 60px;
+            padding: 0.2rem 1rem;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 1rem;
+        }
+
+        /* sección juegos */
+        .games-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.8rem;
+            justify-content: center;
+            margin: 2rem 0 3rem;
+        }
+        .game-card {
+            background: var(--bg-card);
+            border-radius: 28px;
+            padding: 1.5rem 1.8rem;
+            width: 260px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            transition: all 0.25s ease;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            text-align: center;
+        }
+        .game-card:hover {
+            border-color: var(--neon-cyan);
+            transform: translateY(-5px);
+            box-shadow: 0 12px 28px rgba(0, 240, 255, 0.15);
+        }
+        .game-icon {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+        .game-card h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0.5rem 0;
+            color: var(--neon-cyan);
+        }
+        .game-card p {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 1.2rem;
+        }
+        .game-btn {
+            background: transparent;
+            border: 1px solid var(--neon-purple);
+            color: var(--neon-purple);
+            padding: 0.4rem 1rem;
+            border-radius: 40px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 0.8rem;
+        }
+        .game-btn:hover {
+            background: var(--neon-purple);
+            color: #0b0f1c;
+            border-color: var(--neon-purple);
+        }
+        .coming-soon {
+            opacity: 0.7;
+            filter: grayscale(0.2);
+        }
+        .coming-soon .game-btn {
+            cursor: not-allowed;
+            border-color: var(--text-dim);
+            color: var(--text-dim);
+        }
+
+        /* TUTORIAL DE GRAFOS (intuitivo) */
+        .tutorial-section {
+            background: rgba(17, 23, 43, 0.7);
+            backdrop-filter: blur(12px);
+            border-radius: 2rem;
+            padding: 2rem;
+            margin: 2rem 0;
+            border: 1px solid rgba(0, 240, 255, 0.2);
+        }
+        .tutorial-title {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+        .tutorial-title span {
+            background: var(--gold);
+            color: #0b0f1c;
+            padding: 0.2rem 0.8rem;
+            border-radius: 40px;
+            font-size: 0.9rem;
+        }
+        .concept-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.8rem;
+            margin-top: 1.5rem;
+        }
+        .concept-card {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 1.5rem;
+            padding: 1.2rem;
+            border-left: 4px solid var(--neon-cyan);
+        }
+        .concept-card h4 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--gold);
+            margin-bottom: 0.5rem;
+        }
+        .graph-demo {
+            background: #050a14;
+            border-radius: 1rem;
+            padding: 0.8rem;
+            margin: 0.8rem 0;
+            text-align: center;
+        }
+        svg {
+            max-width: 100%;
+            height: auto;
+        }
+        .tip-glow {
+            background: rgba(185, 103, 255, 0.15);
+            border-radius: 1rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            border: 1px dashed var(--neon-purple);
+        }
+        .btn-play-tutorial {
+            background: linear-gradient(95deg, var(--neon-cyan), var(--neon-purple));
+            border: none;
+            padding: 0.7rem 1.8rem;
+            border-radius: 60px;
+            font-weight: bold;
+            color: #0b0f1c;
+            font-family: 'Space Grotesk', sans-serif;
+            margin-top: 1.2rem;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-block;
+            text-decoration: none;
+        }
+        .btn-play-tutorial:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 18px var(--neon-cyan);
+        }
+
+        /* pequeña ayuda juego específico */
+        .game-guide {
+            background: linear-gradient(145deg, #0f162a, #090c18);
+            border-radius: 1.8rem;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border: 1px solid rgba(255, 207, 64, 0.3);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 3rem;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            border-top: 1px solid rgba(0, 240, 255, 0.1);
+            padding-top: 2rem;
+        }
+
+        @media (max-width: 700px) {
+            .container { padding: 1.2rem; }
+            .hero h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Hero -->
+    <div class="hero">
+        <div class="badge-lab">⚡ LABORATORIO DE JUEGOS · MATEMÁTICAS DISCRETAS</div>
+        <h1>Juega, dibuja y conquista grafos</h1>
+        <p>Un espacio donde los vértices y aristas se vuelven aventura. Aprende teoría de grafos mientras exploras mundos, resuelves acertijos y dominas el álgebra oculta.</p>
+    </div>
+
+    <!-- CATÁLOGO DE JUEGOS (actual y futuros) -->
+    <div class="games-grid">
+        <!-- Conjuro de Grafos - Juego principal -->
+        <div class="game-card">
+            <div class="game-icon">🌀</div>
+            <h3>Conjuro de Grafos</h3>
+            <p>Nave estelar, nodos mágicos y desafíos matemáticos. Cambia la estructura del grafo, invoca teoremas y restaura el cosmos.</p>
+            <a href="conjuro_de_grafos_V2.html" class="game-btn" target="_blank">▶ JUGAR AHORA</a>
+        </div>
+        <!-- Futuro juego 2 -->
+        <div class="game-card coming-soon">
+            <div class="game-icon">🌉</div>
+            <h3>Puentes de Königsberg</h3>
+            <p>Recorre caminos eulerianos, descubre si es posible cruzar cada puente una sola vez. Próximamente.</p>
+            <span class="game-btn">PRÓXIMAMENTE</span>
+        </div>
+        <!-- Futuro juego 3 -->
+        <div class="game-card coming-soon">
+            <div class="game-icon">🎨</div>
+            <h3>Coloración Misteriosa</h3>
+            <p>Colorea mapas sin que países vecinos compartan tono. Aprende el número cromático jugando.</p>
+            <span class="game-btn">PRÓXIMAMENTE</span>
+        </div>
+        <!-- Futuro juego 4 -->
+        <div class="game-card coming-soon">
+            <div class="game-icon">🔗</div>
+            <h3>El Laberinto de Ramsey</h3>
+            <p>Encuentra cliques y conjuntos independientes en una arena de teoría extremal.</p>
+            <span class="game-btn">PRÓXIMAMENTE</span>
+        </div>
+    </div>
+
+    <!-- ========== TUTORIAL INTUITIVO DE TEORÍA DE GRAFOS ========== -->
+    <div class="tutorial-section">
+        <div class="tutorial-title">
+            📖 <span>aprende jugando</span> ¿Qué es un grafo?
+        </div>
+        <p style="margin-bottom: 1rem;">Un grafo es una red de <strong style="color:var(--neon-cyan)">puntos (vértices)</strong> unidos por <strong style="color:var(--green-mint)">líneas (aristas)</strong>. Representa amistades, caminos, conexiones eléctricas o incluso moléculas. ¡Todo empieza aquí!</p>
+
+        <div class="concept-grid">
+            <!-- Nodos y aristas -->
+            <div class="concept-card">
+                <h4>⚫ Vértices (nodos)</h4>
+                <div class="graph-demo">
+                    <svg width="160" height="100" viewBox="0 0 160 100">
+                        <circle cx="40" cy="50" r="14" fill="#00f0ff" stroke="#fff" stroke-width="1.5" />
+                        <text x="40" y="55" text-anchor="middle" fill="#0b0f1c" font-size="10" font-weight="bold">A</text>
+                        <circle cx="110" cy="50" r="14" fill="#b967ff" stroke="#fff" stroke-width="1.5" />
+                        <text x="110" y="55" text-anchor="middle" fill="#0b0f1c" font-size="10" font-weight="bold">B</text>
+                        <line x1="54" y1="50" x2="96" y2="50" stroke="#2effb0" stroke-width="2.5" />
+                    </svg>
+                </div>
+                <p>Los <strong>nodos</strong> (A y B) son objetos, personas o ciudades. La <strong>arista</strong> muestra una relación entre ellos.</p>
+            </div>
+            <!-- Grado -->
+            <div class="concept-card">
+                <h4>📐 Grado de un vértice</h4>
+                <div class="graph-demo">
+                    <svg width="180" height="100" viewBox="0 0 180 100">
+                        <circle cx="30" cy="55" r="12" fill="#ffcf40" />
+                        <text x="30" y="60" text-anchor="middle" fill="#0b0f1c" font-size="9">v</text>
+                        <circle cx="80" cy="30" r="10" fill="#00f0ff" />
+                        <circle cx="80" cy="80" r="10" fill="#00f0ff" />
+                        <circle cx="130" cy="55" r="10" fill="#00f0ff" />
+                        <line x1="40" y1="52" x2="72" y2="36" stroke="#ff44cc" stroke-width="2" />
+                        <line x1="40" y1="60" x2="72" y2="72" stroke="#ff44cc" stroke-width="2" />
+                        <line x1="42" y1="55" x2="120" y2="55" stroke="#ff44cc" stroke-width="2" />
+                        <text x="60" y="18" fill="#eef5ff" font-size="9">grado(v) = 3</text>
+                    </svg>
+                </div>
+                <p>El <strong>grado</strong> es el número de aristas que tocan un vértice. Si un nodo tiene 3 conexiones, ¡su grado es 3!</p>
+            </div>
+            <!-- Caminos y ciclos -->
+            <div class="concept-card">
+                <h4>🚶‍♂️ Caminos y Ciclos</h4>
+                <div class="graph-demo">
+                    <svg width="180" height="90" viewBox="0 0 180 90">
+                        <circle cx="30" cy="45" r="10" fill="#2effb0" />
+                        <circle cx="80" cy="25" r="10" fill="#2effb0" />
+                        <circle cx="80" cy="65" r="10" fill="#2effb0" />
+                        <circle cx="130" cy="45" r="10" fill="#b967ff" />
+                        <line x1="40" y1="45" x2="70" y2="33" stroke="#fff" stroke-width="1.5" />
+                        <line x1="40" y1="45" x2="70" y2="57" stroke="#fff" stroke-width="1.5" />
+                        <line x1="90" y1="33" x2="120" y2="45" stroke="#fff" stroke-width="1.5" />
+                        <line x1="90" y1="57" x2="120" y2="45" stroke="#fff" stroke-width="1.5" />
+                        <text x="15" y="80" fill="#8ea3c2" font-size="8">camino</text>
+                    </svg>
+                </div>
+                <p>Un <strong>camino</strong> es una ruta que no repite vértices. Un <strong>ciclo</strong> es un camino que empieza y termina en el mismo sitio.</p>
+            </div>
+            <!-- Árbol y grafo conexo -->
+            <div class="concept-card">
+                <h4>🌳 Árboles y conexidad</h4>
+                <div class="graph-demo">
+                    <svg width="180" height="100" viewBox="0 0 180 100">
+                        <circle cx="90" cy="25" r="10" fill="#00f0ff" />
+                        <circle cx="50" cy="55" r="9" fill="#00f0ff" />
+                        <circle cx="130" cy="55" r="9" fill="#00f0ff" />
+                        <circle cx="70" cy="85" r="9" fill="#00f0ff" />
+                        <circle cx="110" cy="85" r="9" fill="#00f0ff" />
+                        <line x1="90" y1="35" x2="50" y2="50" stroke="#ffcf40" stroke-width="1.5" />
+                        <line x1="90" y1="35" x2="130" y2="50" stroke="#ffcf40" stroke-width="1.5" />
+                        <line x1="50" y1="64" x2="70" y2="78" stroke="#ffcf40" stroke-width="1.5" />
+                        <line x1="130" y1="64" x2="110" y2="78" stroke="#ffcf40" stroke-width="1.5" />
+                    </svg>
+                </div>
+                <p>Un <strong>árbol</strong> es un grafo conectado sin ciclos. Es la estructura más simple y elegante. ¡Todo está unido!</p>
+            </div>
+        </div>
+
+        <div class="tip-glow">
+            <strong>💡 Intuición del juego "Conjuro de Grafos":</strong> Cada nivel presenta un tipo de grafo (árbol, cíclico, bipartito…). Para avanzar, debes explorar nodos (haciendo clic) y responder preguntas como el grado de un nodo, si el grafo es conexo, o cuántos ciclos tiene. A medida que aprendes, puedes invocar teoremas que modifican el grafo. ¡No necesitas saber álgebra avanzada, solo observar y deducir!
+        </div>
+    </div>
+
+    <!-- EXPLICACIÓN DE PROPIEDADES CLAVE (con ejemplos visuales simples) -->
+    <div class="tutorial-section">
+        <div class="tutorial-title">
+            🧩 <span>conceptos estrella</span> Grafos famosos y sus secretos
+        </div>
+        <div class="concept-grid">
+            <div class="concept-card">
+                <h4>🔁 Grafo completo K₄</h4>
+                <div class="graph-demo">
+                    <svg width="140" height="110" viewBox="0 0 140 110">
+                        <circle cx="70" cy="25" r="9" fill="#ff44cc" />
+                        <circle cx="35" cy="75" r="9" fill="#ff44cc" />
+                        <circle cx="105" cy="75" r="9" fill="#ff44cc" />
+                        <circle cx="70" cy="90" r="9" fill="#ff44cc" />
+                        <line x1="70" y1="34" x2="35" y2="66" stroke="#fff" stroke-width="1.2" />
+                        <line x1="70" y1="34" x2="105" y2="66" stroke="#fff" stroke-width="1.2" />
+                        <line x1="70" y1="34" x2="70" y2="81" stroke="#fff" stroke-width="1.2" />
+                        <line x1="35" y1="84" x2="105" y2="84" stroke="#fff" stroke-width="1.2" />
+                        <line x1="35" y1="75" x2="70" y2="90" stroke="#fff" stroke-width="1.2" />
+                        <line x1="105" y1="75" x2="70" y2="90" stroke="#fff" stroke-width="1.2" />
+                    </svg>
+                </div>
+                <p>Todos los vértices conectados entre sí. Cada par de amigos se conoce. Densidad máxima.</p>
+            </div>
+            <div class="concept-card">
+                <h4>⚖️ Grafo bipartito K₂,₃</h4>
+                <div class="graph-demo">
+                    <svg width="140" height="90" viewBox="0 0 140 90">
+                        <circle cx="30" cy="30" r="8" fill="#2effb0" />
+                        <circle cx="30" cy="65" r="8" fill="#2effb0" />
+                        <circle cx="80" cy="20" r="8" fill="#b967ff" />
+                        <circle cx="80" cy="47" r="8" fill="#b967ff" />
+                        <circle cx="80" cy="74" r="8" fill="#b967ff" />
+                        <line x1="38" y1="33" x2="72" y2="25" stroke="#ffcf40" />
+                        <line x1="38" y1="33" x2="72" y2="52" stroke="#ffcf40" />
+                        <line x1="38" y1="33" x2="72" y2="79" stroke="#ffcf40" />
+                        <line x1="38" y1="68" x2="72" y2="25" stroke="#ffcf40" />
+                        <line x1="38" y1="68" x2="72" y2="52" stroke="#ffcf40" />
+                        <line x1="38" y1="68" x2="72" y2="79" stroke="#ffcf40" />
+                    </svg>
+                </div>
+                <p>Dos grupos: las aristas solo existen entre grupos, nunca dentro del mismo. Ideal para emparejamientos.</p>
+            </div>
+            <div class="concept-card">
+                <h4>🌀 Grafo cíclico C₅</h4>
+                <div class="graph-demo">
+                    <svg width="120" height="100" viewBox="0 0 120 100">
+                        <circle cx="60" cy="25" r="7" fill="#00f0ff" />
+                        <circle cx="25" cy="55" r="7" fill="#00f0ff" />
+                        <circle cx="45" cy="85" r="7" fill="#00f0ff" />
+                        <circle cx="75" cy="85" r="7" fill="#00f0ff" />
+                        <circle cx="95" cy="55" r="7" fill="#00f0ff" />
+                        <polygon points="60,25 25,55 45,85 75,85 95,55" fill="none" stroke="#ff44cc" stroke-width="1.8" />
+                    </svg>
+                </div>
+                <p>Un anillo de nodos. Todos tienen grado 2. Forma un solo ciclo. Aparece en redes circulares.</p>
+            </div>
+            <div class="concept-card">
+                <h4>📐 Teorema de Euler (caras)</h4>
+                <div class="graph-demo">
+                    <svg width="120" height="90" viewBox="0 0 120 90">
+                        <polygon points="60,15 100,45 80,80 40,80 20,45" fill="none" stroke="#ffcf40" stroke-width="1.5" />
+                        <text x="55" y="45" fill="#b967ff" font-size="8">V - E + F = 2</text>
+                    </svg>
+                </div>
+                <p>En grafos planos conectados, la fórmula mágica: vértices − aristas + caras = 2.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- GUÍA ESPECÍFICA PARA "CONJURO DE GRAFOS" -->
+    <div class="game-guide">
+        <div style="display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap;">
+            <span style="font-size: 2rem;">🕹️</span>
+            <h3 style="color: var(--gold);">Guía rápida: Cómo jugar "Conjuro de Grafos"</h3>
+        </div>
+        <ul style="margin: 1rem 0 0.5rem 1.5rem; line-height: 1.7;">
+            <li><strong>🚀 Movimiento:</strong> Teclas <strong>WASD o flechas</strong> para pilotar la nave interestelar. Acércate a los nodos (círculos brillantes).</li>
+            <li><strong>🔍 Explorar nodos:</strong> Haz clic sobre un nodo para enfrentar un <strong>desafío matemático</strong>. Si aciertas, ganas energía y puntos, y el nodo queda marcado.</li>
+            <li><strong>⚡ Energía y Escudos:</strong> La energía permite usar teoremas (habilidades especiales). Los escudos te protegen de meteoros. Recupéralos explorando tesoros.</li>
+            <li><strong>📚 Teoremas:</strong> En la pestaña "TEOREMAS" del panel derecho, desbloquea poderes como "Puente de Euler" o "Conexión Directa". Cuestan energía, pero transforman el grafo.</li>
+            <li><strong>🌀 Cambiar tipo de grafo:</strong> Abajo a la derecha hay botones con símbolos (Kₙ, árbol, etc.). ¡Experimenta! Cada cambio afecta las propiedades del grafo.</li>
+            <li><strong>🏆 Avanzar de nivel:</strong> Derrota a todos los nodos enemigos (⚠) y aparecerá el botón "SIGUIENTE SECTOR". Cada sector es un nuevo tipo de grafo.</li>
+        </ul>
+        <div class="tip-glow" style="margin-top: 1rem; background: rgba(0,240,255,0.05);">
+            💡 <strong>Consejo de principiante:</strong> No te preocupes por los números complejos. Mira el grado de cada nodo (aparece en el tooltip al pasar el mouse). Para los desafíos, lee con calma: preguntan cosas como "¿El grafo es conexo?" (casi siempre sí) o "¿Cuál es la suma de grados?" (recuerda: 2 × número de aristas). ¡Aprenderás jugando!
+        </div>
+        <div style="text-align: center; margin-top: 1.5rem;">
+            <a href="conjuro_de_grafos_V2.html" target="_blank" class="btn-play-tutorial">🌀 EMBARCAR EN LA NAVE →</a>
+        </div>
+    </div>
+
+    <!-- SECCIÓN DE FUTUROS JUEGOS Y COMUNIDAD -->
+    <div class="tutorial-section" style="background: rgba(0,0,0,0.3);">
+        <div class="tutorial-title">
+            🎲 <span>próximas experiencias</span> El laboratorio crece
+        </div>
+        <p>Pronto encontrarás más juegos donde pondrás a prueba tus habilidades en teoría de grafos, combinatoria y lógica. Cada juego explorará una faceta distinta:</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0;">
+            <span style="background: #1e2a3e; padding: 0.2rem 0.8rem; border-radius: 30px;">🔷 Caminos hamiltonianos</span>
+            <span style="background: #1e2a3e; padding: 0.2rem 0.8rem; border-radius: 30px;">🔷 Árboles generadores</span>
+            <span style="background: #1e2a3e; padding: 0.2rem 0.8rem; border-radius: 30px;">🔷 Algoritmo de Dijkstra</span>
+            <span style="background: #1e2a3e; padding: 0.2rem 0.8rem; border-radius: 30px;">🔷 Flujo en redes</span>
+        </div>
+    </div>
+
+    <div class="footer">
+        🌌 Laboratorio de Matemáticas Discretas · Aprendizaje basado en juegos · Inspirado en la teoría de grafos, topología intuitiva y diversión cognitiva.
+        <br>〄 "Cada grafo es un universo por descubrir. Juega, dibuja y conecta."
+    </div>
+</div>
+</body>
+</html>
