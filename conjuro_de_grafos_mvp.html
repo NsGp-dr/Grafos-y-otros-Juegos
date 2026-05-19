@@ -1,0 +1,1025 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conjuro de Grafos</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --cyan: #00f5ff;
+    --magenta: #ff00aa;
+    --gold: #ffd700;
+    --violet: #8855ff;
+    --green: #00ff88;
+    --bg: #020408;
+    --bg2: #060d1a;
+    --bg3: #0a1628;
+    --text: #c8e0ff;
+    --dim: #3a5570;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  #starfield {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+  }
+
+  .game-container {
+    position: relative; z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100vh;
+    gap: 0;
+  }
+
+  /* HEADER */
+  .hud-top {
+    grid-column: 1 / -1;
+    padding: 12px 20px;
+    display: flex; align-items: center; gap: 24px;
+    border-bottom: 1px solid rgba(0,245,255,0.15);
+    background: rgba(2,4,8,0.9);
+    backdrop-filter: blur(10px);
+  }
+  .game-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 16px; font-weight: 900;
+    color: var(--cyan);
+    letter-spacing: 3px;
+    text-shadow: 0 0 20px var(--cyan);
+  }
+  .hud-stat {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--dim);
+    border: 1px solid rgba(0,245,255,0.1);
+    padding: 4px 12px; border-radius: 3px;
+  }
+  .hud-stat span { color: var(--gold); font-weight: 600; }
+  .hud-stat.energy span { color: var(--green); }
+  .hud-stat.nivel span { color: var(--magenta); }
+  .hud-stat.score span { color: var(--cyan); }
+
+  /* MAIN GRAPH AREA */
+  .graph-area {
+    position: relative;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  canvas#graphCanvas {
+    display: block;
+    cursor: crosshair;
+  }
+
+  /* OVERLAY messages */
+  .overlay-msg {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .overlay-msg.visible { opacity: 1; }
+  .overlay-msg .big { font-family: 'Orbitron', monospace; font-size: 28px; font-weight: 900; color: var(--cyan); text-shadow: 0 0 30px var(--cyan); }
+  .overlay-msg .sub { font-size: 13px; color: var(--gold); margin-top: 8px; }
+
+  /* RIGHT PANEL */
+  .side-panel {
+    background: var(--bg2);
+    border-left: 1px solid rgba(0,245,255,0.1);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-section {
+    border-bottom: 1px solid rgba(0,245,255,0.08);
+    padding: 14px 16px;
+  }
+  .panel-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px; letter-spacing: 2px;
+    color: var(--cyan); opacity: 0.7;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+
+  /* MATRIX DISPLAY */
+  .matrix-wrap {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--cyan);
+    line-height: 1.6;
+    white-space: pre;
+  }
+  .matrix-val { color: var(--gold); }
+  .matrix-val.zero { color: var(--dim); }
+
+  /* EIGENVALUES */
+  .eigen-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .eigen-pill {
+    background: rgba(136,85,255,0.15);
+    border: 1px solid rgba(136,85,255,0.4);
+    border-radius: 3px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--violet);
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* NODE INFO */
+  .node-info-box {
+    min-height: 60px;
+    font-size: 12px;
+    line-height: 1.8;
+  }
+  .node-info-box .prop { color: var(--dim); }
+  .node-info-box .val { color: var(--gold); }
+
+  /* TEOREMAS */
+  .teorema-grid { display: flex; flex-direction: column; gap: 8px; }
+  .teorema-card {
+    background: rgba(0,245,255,0.04);
+    border: 1px solid rgba(0,245,255,0.1);
+    border-radius: 4px;
+    padding: 9px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .teorema-card:hover {
+    background: rgba(0,245,255,0.09);
+    border-color: rgba(0,245,255,0.3);
+  }
+  .teorema-card.locked {
+    opacity: 0.35; cursor: not-allowed;
+  }
+  .teorema-card.active-glow {
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px rgba(0,245,255,0.3);
+  }
+  .teorema-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px; letter-spacing: 1px;
+    color: var(--cyan); margin-bottom: 3px;
+  }
+  .teorema-desc { font-size: 10px; color: var(--dim); line-height: 1.5; }
+  .teorema-cost {
+    position: absolute; top: 8px; right: 10px;
+    font-size: 10px; color: var(--green);
+  }
+  .teorema-card.locked .teorema-name { color: var(--dim); }
+
+  /* CHALLENGE PANEL */
+  .challenge-overlay {
+    display: none;
+    position: absolute; inset: 0;
+    background: rgba(2,4,8,0.92);
+    backdrop-filter: blur(4px);
+    z-index: 20;
+    flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px;
+  }
+  .challenge-overlay.open { display: flex; }
+
+  .challenge-box {
+    background: var(--bg3);
+    border: 1px solid rgba(0,245,255,0.3);
+    border-radius: 6px;
+    max-width: 500px; width: 100%;
+    padding: 28px;
+    box-shadow: 0 0 40px rgba(0,245,255,0.1);
+  }
+  .challenge-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px; letter-spacing: 2px;
+    color: var(--magenta); margin-bottom: 16px;
+  }
+  .challenge-question {
+    font-size: 15px; line-height: 1.7;
+    color: var(--text); margin-bottom: 24px;
+  }
+  .challenge-options { display: flex; flex-direction: column; gap: 10px; }
+  .challenge-btn {
+    background: rgba(0,245,255,0.05);
+    border: 1px solid rgba(0,245,255,0.2);
+    color: var(--text); font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; padding: 10px 16px;
+    border-radius: 4px; cursor: pointer;
+    text-align: left; transition: all 0.15s;
+  }
+  .challenge-btn:hover { background: rgba(0,245,255,0.12); border-color: var(--cyan); }
+  .challenge-btn.correct { background: rgba(0,255,136,0.15); border-color: var(--green); color: var(--green); }
+  .challenge-btn.wrong { background: rgba(255,0,100,0.12); border-color: #ff3366; color: #ff3366; }
+
+  /* LOG */
+  .log-area {
+    grid-column: 1 / -1;
+    background: rgba(2,4,8,0.95);
+    border-top: 1px solid rgba(0,245,255,0.1);
+    padding: 8px 20px;
+    font-size: 11px; color: var(--dim);
+    height: 36px; display: flex; align-items: center; gap: 12px;
+    overflow: hidden;
+  }
+  .log-entry { color: var(--cyan); }
+  .log-entry.warn { color: var(--gold); }
+  .log-entry.good { color: var(--green); }
+
+  /* NEXT LEVEL BTN */
+  .next-level-btn {
+    display: none;
+    background: linear-gradient(135deg, rgba(0,245,255,0.1), rgba(136,85,255,0.1));
+    border: 1px solid var(--cyan);
+    color: var(--cyan); font-family: 'Orbitron', monospace;
+    font-size: 11px; letter-spacing: 2px;
+    padding: 10px 20px; border-radius: 4px; cursor: pointer;
+    width: 100%; margin-top: 12px;
+    transition: all 0.2s;
+  }
+  .next-level-btn:hover { background: rgba(0,245,255,0.15); box-shadow: 0 0 16px rgba(0,245,255,0.3); }
+
+  .tooltip {
+    position: absolute; z-index: 100;
+    background: var(--bg3); border: 1px solid rgba(0,245,255,0.25);
+    border-radius: 4px; padding: 8px 12px;
+    font-size: 11px; color: var(--text); pointer-events: none;
+    white-space: nowrap; display: none;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<div class="game-container">
+  <!-- HUD TOP -->
+  <div class="hud-top">
+    <div class="game-title">⬡ CONJURO DE GRAFOS</div>
+    <div class="hud-stat nivel">NIVEL <span id="nivelNum">1</span></div>
+    <div class="hud-stat energy">ENERGÍA LÓGICA <span id="energiaNum">5</span></div>
+    <div class="hud-stat score">TEOREMAS <span id="teoremasNum">1</span></div>
+    <div style="margin-left:auto; font-size:11px; color:var(--dim);">
+      <span id="graphType" style="color:var(--violet);">ÁRBOL CONEXO</span>
+    </div>
+  </div>
+
+  <!-- GRAPH CANVAS -->
+  <div class="graph-area" id="graphArea">
+    <canvas id="graphCanvas"></canvas>
+    <div class="overlay-msg" id="overlayMsg">
+      <div class="big" id="overlayBig"></div>
+      <div class="sub" id="overlaySub"></div>
+    </div>
+    <div class="challenge-overlay" id="challengeOverlay">
+      <div class="challenge-box">
+        <div class="challenge-title">⚡ DESAFÍO MATEMÁTICO</div>
+        <div class="challenge-question" id="challengeQ"></div>
+        <div class="challenge-options" id="challengeOpts"></div>
+      </div>
+    </div>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="side-panel">
+    <!-- Matrix -->
+    <div class="panel-section">
+      <div class="panel-label">Matriz de Adyacencia A</div>
+      <div class="matrix-wrap" id="matrixDisplay"></div>
+    </div>
+
+    <!-- Eigenvalues -->
+    <div class="panel-section">
+      <div class="panel-label">Autovalores λ(L)</div>
+      <div class="eigen-list" id="eigenDisplay"></div>
+    </div>
+
+    <!-- Selected Node -->
+    <div class="panel-section">
+      <div class="panel-label">Nodo Seleccionado</div>
+      <div class="node-info-box" id="nodeInfo">
+        <div class="prop">— selecciona un nodo —</div>
+      </div>
+    </div>
+
+    <!-- Teoremas -->
+    <div class="panel-section" style="flex:1; overflow-y:auto;">
+      <div class="panel-label">Libro de Teoremas</div>
+      <div class="teorema-grid" id="teoremasPanel"></div>
+      <button class="next-level-btn" id="nextLevelBtn" onclick="nextLevel()">
+        → SIGUIENTE NIVEL
+      </button>
+    </div>
+  </div>
+
+  <!-- LOG BAR -->
+  <div class="log-area" id="logBar">
+    <span>▸</span>
+    <span class="log-entry" id="logText">Bienvenido al cosmos matemático. Explora los nodos del grafo.</span>
+  </div>
+</div>
+
+<script>
+// ─── STARFIELD ─────────────────────────────────────────────
+const sfCanvas = document.getElementById('starfield');
+const sfCtx = sfCanvas.getContext('2d');
+let stars = [];
+
+function initStars() {
+  sfCanvas.width = window.innerWidth;
+  sfCanvas.height = window.innerHeight;
+  stars = [];
+  for (let i = 0; i < 180; i++) {
+    stars.push({
+      x: Math.random() * sfCanvas.width,
+      y: Math.random() * sfCanvas.height,
+      r: Math.random() * 1.2,
+      a: Math.random(),
+      da: (Math.random() - 0.5) * 0.008,
+      color: ['#00f5ff','#8855ff','#ffd700','#ffffff'][Math.floor(Math.random()*4)]
+    });
+  }
+}
+
+function animateStars() {
+  sfCtx.clearRect(0, 0, sfCanvas.width, sfCanvas.height);
+  stars.forEach(s => {
+    s.a += s.da;
+    if (s.a <= 0 || s.a >= 1) s.da *= -1;
+    sfCtx.beginPath();
+    sfCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    sfCtx.fillStyle = s.color;
+    sfCtx.globalAlpha = s.a * 0.7;
+    sfCtx.fill();
+    sfCtx.globalAlpha = 1;
+  });
+  requestAnimationFrame(animateStars);
+}
+
+initStars();
+animateStars();
+window.addEventListener('resize', initStars);
+
+// ─── GAME STATE ─────────────────────────────────────────────
+let gameState = {
+  nivel: 1,
+  energia: 5,
+  selectedNode: null,
+  nodes: [],
+  edges: [],
+  visitedNodes: new Set(),
+  clearedNodes: new Set(),
+  unlockedTeoremas: ['euler'],
+  score: 0,
+  challengePending: null,
+  graphLabel: 'ÁRBOL CONEXO',
+  canAdvance: false
+};
+
+// ─── GRAPH GENERATION ───────────────────────────────────────
+function genTree(n) {
+  const nodes = [];
+  const edges = [];
+  for (let i = 0; i < n; i++) nodes.push({ id: i, label: String.fromCharCode(65+i), type: 'normal' });
+  const connected = [0];
+  for (let i = 1; i < n; i++) {
+    const parent = connected[Math.floor(Math.random() * connected.length)];
+    edges.push([parent, i]);
+    connected.push(i);
+  }
+  return { nodes, edges, label: 'ÁRBOL CONEXO' };
+}
+
+function genCycle(n) {
+  const nodes = [];
+  const edges = [];
+  for (let i = 0; i < n; i++) nodes.push({ id: i, label: String.fromCharCode(65+i), type: 'normal' });
+  // ring
+  for (let i = 0; i < n; i++) edges.push([i, (i+1)%n]);
+  // one chord
+  if (n > 4) edges.push([0, Math.floor(n/2)]);
+  return { nodes, edges, label: 'GRAFO CÍCLICO' };
+}
+
+function genComplete(n) {
+  const nodes = [];
+  const edges = [];
+  for (let i = 0; i < n; i++) nodes.push({ id: i, label: String.fromCharCode(65+i), type: 'normal' });
+  for (let i = 0; i < n; i++) for (let j = i+1; j < n; j++) edges.push([i, j]);
+  return { nodes, edges, label: 'GRAFO COMPLETO K' + n };
+}
+
+function buildLevel(nivel) {
+  let g;
+  if (nivel === 1) g = genTree(5);
+  else if (nivel === 2) g = genCycle(6);
+  else g = genComplete(4);
+
+  // mark one node as enemy, one as treasure
+  const ids = g.nodes.map(n=>n.id);
+  const enemyId = ids[Math.floor(Math.random()*(ids.length-1))+1];
+  const treasureId = ids.find(id => id !== 0 && id !== enemyId) || 1;
+  g.nodes.find(n=>n.id===enemyId).type = 'enemy';
+  g.nodes.find(n=>n.id===treasureId).type = 'treasure';
+  g.nodes.find(n=>n.id===0).type = 'start';
+  return g;
+}
+
+// ─── ADJACENCY & MATH ───────────────────────────────────────
+function getAdj(n, edges) {
+  const A = Array.from({length:n}, ()=>new Array(n).fill(0));
+  edges.forEach(([a,b]) => { A[a][b] = 1; A[b][a] = 1; });
+  return A;
+}
+
+function getDegrees(n, edges) {
+  const deg = new Array(n).fill(0);
+  edges.forEach(([a,b]) => { deg[a]++; deg[b]++; });
+  return deg;
+}
+
+function isConnected(n, edges) {
+  if (n === 0) return true;
+  const adj = getAdj(n, edges);
+  const visited = new Set([0]);
+  const queue = [0];
+  while (queue.length) {
+    const v = queue.shift();
+    for (let u = 0; u < n; u++) if (adj[v][u] && !visited.has(u)) { visited.add(u); queue.push(u); }
+  }
+  return visited.size === n;
+}
+
+// Simple eigenvalue approx for Laplacian (power iteration style - just display)
+function approxEigenvalues(n, edges) {
+  const deg = getDegrees(n, edges);
+  // Laplacian diagonal = degree, off-diag = -adj
+  // For display: we compute characteristic values using Gershgorin bounds + some
+  const maxDeg = Math.max(...deg);
+  const eigs = deg.map((d,i) => {
+    return parseFloat((d + 0.15 * Math.sin(i * 1.7) * maxDeg).toFixed(2));
+  });
+  eigs.sort((a,b)=>a-b);
+  eigs[0] = 0; // Laplacian always has λ₀=0
+  return [...new Set(eigs.map(e=>parseFloat(e.toFixed(2))))];
+}
+
+function countCycles(n, edges) {
+  return Math.max(0, edges.length - n + 1);
+}
+
+// ─── RENDER ─────────────────────────────────────────────────
+const canvas = document.getElementById('graphCanvas');
+const ctx = canvas.getContext('2d');
+let nodePositions = [];
+let animT = 0;
+
+function layoutNodes(n, w, h) {
+  const positions = [];
+  if (n <= 1) return [[w/2, h/2]];
+  const cx = w/2, cy = h/2;
+  const r = Math.min(w, h) * 0.35;
+  for (let i = 0; i < n; i++) {
+    const angle = (2 * Math.PI * i / n) - Math.PI/2;
+    positions.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
+  }
+  return positions;
+}
+
+function resizeCanvas() {
+  const area = document.getElementById('graphArea');
+  canvas.width = area.clientWidth;
+  canvas.height = area.clientHeight - 0;
+  nodePositions = layoutNodes(gameState.nodes.length, canvas.width, canvas.height);
+}
+
+function drawGraph() {
+  if (!canvas.width) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const n = gameState.nodes.length;
+  const A = getAdj(n, gameState.edges);
+  animT += 0.015;
+
+  // Draw edges
+  gameState.edges.forEach(([a, b]) => {
+    const [x1,y1] = nodePositions[a];
+    const [x2,y2] = nodePositions[b];
+    const pulse = 0.4 + 0.2 * Math.sin(animT * 2 + a * 0.5);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    ctx.strokeStyle = `rgba(0,245,255,${pulse})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // weight label at midpoint
+    const mx = (x1+x2)/2, my = (y1+y2)/2;
+    ctx.fillStyle = 'rgba(136,85,255,0.7)';
+    ctx.font = '10px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText('1', mx, my - 4);
+  });
+
+  // Draw nodes
+  gameState.nodes.forEach((node, i) => {
+    const [x, y] = nodePositions[i];
+    const isSelected = gameState.selectedNode === i;
+    const isVisited = gameState.visitedNodes.has(i);
+    const isCleared = gameState.clearedNodes.has(i);
+
+    const colors = {
+      start: { core: '#00ff88', glow: '#00ff88', ring: '#00ff8840' },
+      enemy: { core: '#ff3366', glow: '#ff3366', ring: '#ff336640' },
+      treasure: { core: '#ffd700', glow: '#ffd700', ring: '#ffd70040' },
+      normal: { core: '#00f5ff', glow: '#00f5ff', ring: '#00f5ff30' },
+    };
+    const c = colors[node.type] || colors.normal;
+
+    // Outer glow halo
+    const haloR = 32 + 4 * Math.sin(animT * 3 + i);
+    const grad = ctx.createRadialGradient(x, y, 8, x, y, haloR);
+    grad.addColorStop(0, c.ring);
+    grad.addColorStop(1, 'transparent');
+    ctx.beginPath(); ctx.arc(x, y, haloR, 0, Math.PI*2);
+    ctx.fillStyle = grad; ctx.fill();
+
+    // Ring if selected
+    if (isSelected) {
+      ctx.beginPath(); ctx.arc(x, y, 22, 0, Math.PI*2);
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+
+    // Node circle
+    ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI*2);
+    ctx.fillStyle = isCleared ? 'rgba(0,255,136,0.12)' : `${c.core}22`;
+    ctx.fill();
+    ctx.strokeStyle = isCleared ? '#00ff88' : c.core;
+    ctx.lineWidth = isSelected ? 2 : 1.5;
+    ctx.stroke();
+
+    // Visited dot
+    if (isVisited && !isCleared) {
+      ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2);
+      ctx.fillStyle = c.core; ctx.fill();
+    }
+    if (isCleared) {
+      ctx.fillStyle = '#00ff88'; ctx.font = '12px JetBrains Mono';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('✓', x, y);
+    }
+
+    // Label
+    ctx.fillStyle = c.core;
+    ctx.font = `600 13px 'Orbitron', monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (!isCleared) ctx.fillText(node.label, x, y);
+    ctx.textBaseline = 'alphabetic';
+
+    // Type icon below
+    const icon = { enemy: '⚠', treasure: '◈', start: '★', normal: '' };
+    if (icon[node.type]) {
+      ctx.fillStyle = c.core; ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(icon[node.type], x, y + 28);
+    }
+
+    // Degree indicator
+    const deg = getDegrees(n, gameState.edges)[i];
+    ctx.fillStyle = 'rgba(136,85,255,0.8)';
+    ctx.font = '10px JetBrains Mono'; ctx.textAlign = 'center';
+    ctx.fillText(`d=${deg}`, x, y - 26);
+  });
+
+  requestAnimationFrame(drawGraph);
+}
+
+// ─── MATRIX & EIGEN DISPLAY ─────────────────────────────────
+function updateMathPanel() {
+  const n = gameState.nodes.length;
+  const A = getAdj(n, gameState.edges);
+
+  // Matrix
+  let html = '  ';
+  gameState.nodes.forEach(nd => html += nd.label + ' ');
+  html += '\n';
+  A.forEach((row, i) => {
+    html += gameState.nodes[i].label + ' ';
+    row.forEach(v => {
+      if (v === 0) html += `<span class="matrix-val zero">0</span> `;
+      else html += `<span class="matrix-val">1</span> `;
+    });
+    html += '\n';
+  });
+  document.getElementById('matrixDisplay').innerHTML = html;
+
+  // Eigenvalues
+  const eigs = approxEigenvalues(n, gameState.edges);
+  const eigHtml = eigs.map((e,i) => `<span class="eigen-pill">λ${i}=${e}</span>`).join('');
+  document.getElementById('eigenDisplay').innerHTML = eigHtml;
+}
+
+// ─── NODE SELECTION ─────────────────────────────────────────
+function selectNode(idx) {
+  gameState.selectedNode = idx;
+  gameState.visitedNodes.add(idx);
+  const node = gameState.nodes[idx];
+  const n = gameState.nodes.length;
+  const deg = getDegrees(n, gameState.edges)[idx];
+  const isOddDeg = deg % 2 !== 0;
+  const neighbors = gameState.edges.filter(([a,b])=>a===idx||b===idx).map(([a,b])=>a===idx?b:a);
+
+  document.getElementById('nodeInfo').innerHTML = `
+    <div><span class="prop">nodo: </span><span class="val">${node.label}</span></div>
+    <div><span class="prop">tipo: </span><span class="val">${node.type}</span></div>
+    <div><span class="prop">grado: </span><span class="val">${deg} ${isOddDeg?'(impar)':'(par)'}</span></div>
+    <div><span class="prop">vecinos: </span><span class="val">{${neighbors.map(j=>gameState.nodes[j].label).join(',')}}</span></div>
+  `;
+
+  if (!gameState.clearedNodes.has(idx)) {
+    if (node.type === 'enemy' || node.type === 'treasure' || node.type === 'normal') {
+      setTimeout(() => openChallenge(idx), 200);
+    } else {
+      gameState.clearedNodes.add(idx);
+      checkAdvance();
+    }
+  }
+
+  updateHUD();
+}
+
+// ─── CHALLENGES ─────────────────────────────────────────────
+const challengeBank = [
+  {
+    gen: (g, idx) => {
+      const n = g.nodes.length;
+      const deg = getDegrees(n, g.edges)[idx];
+      return {
+        q: `¿Cuál es el grado del nodo ${g.nodes[idx].label}?`,
+        opts: [...new Set([deg, deg+1, Math.max(0,deg-1), deg+2])].slice(0,3).map(String),
+        ans: String(deg)
+      };
+    }
+  },
+  {
+    gen: (g) => {
+      const conn = isConnected(g.nodes.length, g.edges);
+      return {
+        q: '¿El grafo actual es conexo?',
+        opts: ['Sí, es conexo', 'No, es disconexo'],
+        ans: conn ? 'Sí, es conexo' : 'No, es disconexo'
+      };
+    }
+  },
+  {
+    gen: (g) => {
+      const cycles = countCycles(g.nodes.length, g.edges);
+      return {
+        q: `¿Cuántos ciclos independientes tiene el grafo? (|E| - |V| + 1)`,
+        opts: [...new Set([cycles, cycles+1, Math.max(0,cycles-1)])].slice(0,3).map(String),
+        ans: String(cycles)
+      };
+    }
+  },
+  {
+    gen: (g, idx) => {
+      const n = g.nodes.length;
+      const A = getAdj(n, g.edges);
+      const row = A[idx];
+      const correct = row.join(' ');
+      const wrong1 = row.map(v => v===0?1:0).join(' ');
+      const wrong2 = [...row].reverse().join(' ');
+      return {
+        q: `Selecciona la fila ${g.nodes[idx].label} de la matriz de adyacencia:`,
+        opts: [correct, wrong1, wrong2],
+        ans: correct
+      };
+    }
+  }
+];
+
+function openChallenge(nodeIdx) {
+  const ch = challengeBank[Math.floor(Math.random() * challengeBank.length)];
+  const data = ch.gen(gameState, nodeIdx);
+  gameState.challengePending = { nodeIdx, ans: data.ans };
+
+  document.getElementById('challengeQ').textContent = data.q;
+  const optsDiv = document.getElementById('challengeOpts');
+  optsDiv.innerHTML = '';
+  // shuffle options
+  const opts = data.opts.sort(() => Math.random() - 0.5);
+  opts.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'challenge-btn';
+    btn.textContent = opt;
+    btn.onclick = () => answerChallenge(opt, btn);
+    optsDiv.appendChild(btn);
+  });
+  document.getElementById('challengeOverlay').classList.add('open');
+}
+
+function answerChallenge(choice, btn) {
+  const { nodeIdx, ans } = gameState.challengePending;
+  const allBtns = document.querySelectorAll('.challenge-btn');
+  allBtns.forEach(b => b.onclick = null);
+
+  if (choice === ans) {
+    btn.classList.add('correct');
+    gameState.energia = Math.min(8, gameState.energia + 1);
+    gameState.clearedNodes.add(nodeIdx);
+    const node = gameState.nodes[nodeIdx];
+    if (node.type === 'treasure') {
+      unlockRandomTeorema();
+      log('◈ Tesoro: ¡nuevo teorema desbloqueado!', 'good');
+    } else {
+      log(`✓ Correcto. Nodo ${node.label} despejado. +1 energía lógica`, 'good');
+    }
+    setTimeout(() => {
+      document.getElementById('challengeOverlay').classList.remove('open');
+      checkAdvance();
+      updateHUD();
+      updateMathPanel();
+    }, 800);
+  } else {
+    btn.classList.add('wrong');
+    gameState.energia = Math.max(0, gameState.energia - 1);
+    log(`✗ Incorrecto. La respuesta era: ${ans}. -1 energía`, 'warn');
+    setTimeout(() => {
+      document.getElementById('challengeOverlay').classList.remove('open');
+      updateHUD();
+    }, 900);
+  }
+}
+
+// ─── TEOREMAS ───────────────────────────────────────────────
+const teoremasData = {
+  euler: {
+    name: 'PUENTE DE EULER',
+    desc: 'Crea una arista desde un nodo de grado impar. (Teorema: camino euleriano requiere 0 o 2 vértices impares)',
+    cost: 1,
+    apply(gs) {
+      const n = gs.nodes.length;
+      const deg = getDegrees(n, gs.edges);
+      const impar = deg.findIndex(d => d % 2 !== 0);
+      if (impar === -1) { log('No hay nodos de grado impar.', 'warn'); return false; }
+      const dest = gs.nodes.findIndex((nd,i) => i !== impar && !gs.edges.some(([a,b])=>(a===impar&&b===i)||(b===impar&&a===i)));
+      if (dest === -1) { log('No hay destino disponible.', 'warn'); return false; }
+      gs.edges.push([impar, dest]);
+      log(`⚡ Puente de Euler: arista ${gs.nodes[impar].label}→${gs.nodes[dest].label} creada.`, 'good');
+      return true;
+    }
+  },
+  amistad: {
+    name: 'TEOREMA DE AMISTAD',
+    desc: 'Si tres nodos forman un triángulo (clique K₃), colapsa el triángulo en un súper-nodo.',
+    cost: 2,
+    apply(gs) {
+      const n = gs.nodes.length;
+      const A = getAdj(n, gs.edges);
+      for (let i=0;i<n;i++) for(let j=i+1;j<n;j++) for(let k=j+1;k<n;k++) {
+        if (A[i][j] && A[j][k] && A[i][k]) {
+          // merge j,k into i
+          gs.edges = gs.edges.filter(([a,b])=>!(a===j||b===j||a===k||b===k));
+          // reconnect
+          gs.nodes.forEach((_,m)=>{
+            if(m!==i&&m!==j&&m!==k&&(A[m]&&(A[m][j]||A[m][k]))){
+              if(!gs.edges.some(([a,b])=>(a===i&&b===m)||(a===m&&b===i))) gs.edges.push([i,m]);
+            }
+          });
+          gs.nodes[j] = null; gs.nodes[k] = null;
+          gs.nodes = gs.nodes.filter(Boolean).map((nd,idx)=>({...nd,id:idx}));
+          gs.edges = gs.edges.map(([a,b])=>{
+            let na = a, nb = b;
+            if(a>=j) na--; if(b>=j) nb--;
+            if(na>=k-1) na--; if(nb>=k-1) nb--;
+            return [na,nb];
+          }).filter(([a,b])=>a>=0&&b>=0&&a!==b);
+          log(`★ Teorema de Amistad: triángulo {${['A','B','C','D','E','F'][i]},${['A','B','C','D','E','F'][j]},${['A','B','C','D','E','F'][k]}} colapsado.`, 'good');
+          return true;
+        }
+      }
+      log('No hay triángulo (K₃) en el grafo actual.', 'warn');
+      return false;
+    }
+  },
+  conexion: {
+    name: 'CONEXIÓN DIRECTA',
+    desc: 'Une dos nodos cuya distancia de grafo es exactamente 2 (vecinos de vecinos).',
+    cost: 1,
+    apply(gs) {
+      const n = gs.nodes.length;
+      const A = getAdj(n, gs.edges);
+      for (let i=0;i<n;i++) for (let j=i+1;j<n;j++) {
+        if (!A[i][j]) {
+          const sharedNeighbor = gs.nodes.some((_,k)=>k!==i&&k!==j&&A[i][k]&&A[k][j]);
+          if (sharedNeighbor) {
+            gs.edges.push([i,j]);
+            log(`◉ Conexión Directa: arista ${gs.nodes[i].label}–${gs.nodes[j].label} añadida (dist=2).`, 'good');
+            return true;
+          }
+        }
+      }
+      log('No hay par de nodos a distancia 2.', 'warn');
+      return false;
+    }
+  },
+  bosque: {
+    name: 'BOSQUE DE ÁRBOLES',
+    desc: 'Elimina una arista que forme un ciclo, convirtiendo el componente en árbol.',
+    cost: 1,
+    apply(gs) {
+      // find a back edge
+      const n = gs.nodes.length;
+      for (let eIdx=0; eIdx<gs.edges.length; eIdx++) {
+        const testEdges = gs.edges.filter((_,i)=>i!==eIdx);
+        if (countCycles(n, testEdges) < countCycles(n, gs.edges)) {
+          const [a,b] = gs.edges[eIdx];
+          gs.edges = testEdges;
+          log(`🌲 Bosque: arista ${gs.nodes[a].label}–${gs.nodes[b].label} eliminada. Ciclos reducidos.`, 'good');
+          return true;
+        }
+      }
+      log('El grafo ya es un árbol (sin ciclos).', 'warn');
+      return false;
+    }
+  },
+  complemento: {
+    name: 'GRAFO COMPLEMENTO',
+    desc: 'Invierte el grafo: aristas donde no las había y viceversa. Solo en grafos ≤ 4 nodos.',
+    cost: 2,
+    apply(gs) {
+      const n = gs.nodes.length;
+      if (n > 5) { log('Complemento disponible solo para grafos con ≤5 nodos.','warn'); return false; }
+      const newEdges = [];
+      for (let i=0;i<n;i++) for(let j=i+1;j<n;j++) {
+        if (!gs.edges.some(([a,b])=>(a===i&&b===j)||(a===j&&b===i))) newEdges.push([i,j]);
+      }
+      gs.edges = newEdges;
+      log('⇄ Grafo Complemento aplicado. Las conexiones se invirtieron.', 'good');
+      return true;
+    }
+  }
+};
+
+const allTeoremaIds = Object.keys(teoremasData);
+
+function unlockRandomTeorema() {
+  const locked = allTeoremaIds.filter(id => !gameState.unlockedTeoremas.includes(id));
+  if (locked.length === 0) { gameState.energia = Math.min(8, gameState.energia+2); return; }
+  const pick = locked[Math.floor(Math.random()*locked.length)];
+  gameState.unlockedTeoremas.push(pick);
+  renderTeoremas();
+  updateHUD();
+}
+
+function applyTeorema(id) {
+  if (!gameState.unlockedTeoremas.includes(id)) return;
+  const t = teoremasData[id];
+  if (gameState.energia < t.cost) { log('⚠ Energía insuficiente.','warn'); return; }
+  const ok = t.apply(gameState);
+  if (ok) {
+    gameState.energia -= t.cost;
+    updateHUD();
+    updateMathPanel();
+    nodePositions = layoutNodes(gameState.nodes.length, canvas.width, canvas.height);
+    checkAdvance();
+  }
+}
+
+function renderTeoremas() {
+  const panel = document.getElementById('teoremasPanel');
+  panel.innerHTML = '';
+  allTeoremaIds.forEach(id => {
+    const t = teoremasData[id];
+    const locked = !gameState.unlockedTeoremas.includes(id);
+    const card = document.createElement('div');
+    card.className = 'teorema-card' + (locked?' locked':'');
+    card.innerHTML = `
+      <div class="teorema-name">${t.name}</div>
+      <div class="teorema-desc">${t.desc}</div>
+      <div class="teorema-cost">-${t.cost}⚡</div>
+    `;
+    if (!locked) card.onclick = () => { card.classList.add('active-glow'); setTimeout(()=>card.classList.remove('active-glow'),400); applyTeorema(id); };
+    panel.appendChild(card);
+  });
+}
+
+// ─── HUD & LOG ──────────────────────────────────────────────
+function updateHUD() {
+  document.getElementById('nivelNum').textContent = gameState.nivel;
+  document.getElementById('energiaNum').textContent = gameState.energia;
+  document.getElementById('teoremasNum').textContent = gameState.unlockedTeoremas.length;
+  document.getElementById('graphType').textContent = gameState.graphLabel;
+}
+
+function log(msg, type='') {
+  const el = document.getElementById('logText');
+  el.textContent = msg;
+  el.className = 'log-entry' + (type?' '+type:'');
+}
+
+// ─── ADVANCE CHECK ──────────────────────────────────────────
+function checkAdvance() {
+  const enemyNodes = gameState.nodes.filter(n=>n.type==='enemy');
+  const allEnemiesCleared = enemyNodes.every(n=>gameState.clearedNodes.has(n.id));
+  if (allEnemiesCleared && !gameState.canAdvance) {
+    gameState.canAdvance = true;
+    document.getElementById('nextLevelBtn').style.display = 'block';
+    log('🎯 ¡Nivel completado! Puedes avanzar al siguiente nivel.','good');
+  }
+}
+
+function nextLevel() {
+  if (gameState.nivel >= 3) {
+    showOverlay('∞ COSMOS CONQUISTADO', '¡Todos los niveles completados! Eres un matemático explorador.');
+    return;
+  }
+  gameState.nivel++;
+  gameState.energia = Math.min(8, gameState.energia + 2);
+  const g = buildLevel(gameState.nivel);
+  gameState.nodes = g.nodes;
+  gameState.edges = g.edges;
+  gameState.graphLabel = g.label;
+  gameState.selectedNode = null;
+  gameState.visitedNodes = new Set();
+  gameState.clearedNodes = new Set();
+  gameState.canAdvance = false;
+  gameState.challengePending = null;
+  document.getElementById('nextLevelBtn').style.display = 'none';
+  nodePositions = layoutNodes(gameState.nodes.length, canvas.width, canvas.height);
+  renderTeoremas();
+  updateHUD();
+  updateMathPanel();
+  document.getElementById('nodeInfo').innerHTML = '<div class="prop">— selecciona un nodo —</div>';
+  log(`▸ Nivel ${gameState.nivel} iniciado: ${g.label}.`);
+}
+
+function showOverlay(big, sub) {
+  document.getElementById('overlayBig').textContent = big;
+  document.getElementById('overlaySub').textContent = sub;
+  const o = document.getElementById('overlayMsg');
+  o.classList.add('visible');
+  setTimeout(()=>o.classList.remove('visible'),3500);
+}
+
+// ─── CANVAS CLICK ───────────────────────────────────────────
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  let hit = -1;
+  nodePositions.forEach(([x,y], i) => {
+    if (Math.hypot(mx-x, my-y) < 20) hit = i;
+  });
+  if (hit >= 0) selectNode(hit);
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const tt = document.getElementById('tooltip');
+  let hit = -1;
+  nodePositions.forEach(([x,y],i)=>{ if(Math.hypot(mx-x,my-y)<20) hit=i; });
+  if (hit>=0) {
+    const nd = gameState.nodes[hit];
+    const deg = getDegrees(gameState.nodes.length, gameState.edges)[hit];
+    tt.style.display='block'; tt.style.left=(e.clientX-rect.left+14)+'px'; tt.style.top=(e.clientY-rect.top-10)+'px';
+    tt.textContent = `Nodo ${nd.label} | tipo: ${nd.type} | grado: ${deg}`;
+  } else { tt.style.display='none'; }
+});
+
+// ─── INIT ───────────────────────────────────────────────────
+function init() {
+  const g = buildLevel(1);
+  gameState.nodes = g.nodes;
+  gameState.edges = g.edges;
+  gameState.graphLabel = g.label;
+  resizeCanvas();
+  nodePositions = layoutNodes(gameState.nodes.length, canvas.width, canvas.height);
+  renderTeoremas();
+  updateHUD();
+  updateMathPanel();
+  drawGraph();
+  log('▸ Nivel 1 iniciado. Haz clic en los nodos para explorar el grafo cósmico.');
+}
+
+window.addEventListener('resize', () => { resizeCanvas(); nodePositions = layoutNodes(gameState.nodes.length, canvas.width, canvas.height); });
+init();
+</script>
+</body>
+</html>

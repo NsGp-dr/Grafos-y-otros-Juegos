@@ -1,0 +1,1951 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conjuro de Grafos — Cosmos Edition</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  --cyan: #00f5ff;
+  --magenta: #ff00aa;
+  --gold: #ffd700;
+  --violet: #8855ff;
+  --green: #00ff88;
+  --red: #ff3366;
+  --orange: #ff8800;
+  --bg: #020408;
+  --bg2: #060d1a;
+  --bg3: #0a1628;
+  --text: #c8e0ff;
+  --dim: #3a5570;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+}
+
+/* ─── LAYOUT ─── */
+.game-wrap {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  grid-template-rows: 52px 1fr 36px;
+  height: 100vh;
+}
+
+/* ─── HUD TOP ─── */
+.hud-top {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 20px;
+  background: rgba(2,4,8,0.95);
+  border-bottom: 1px solid rgba(0,245,255,0.12);
+  backdrop-filter: blur(12px);
+  z-index: 10;
+}
+
+.game-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 14px; font-weight: 900;
+  color: var(--cyan);
+  letter-spacing: 4px;
+  text-shadow: 0 0 20px var(--cyan);
+  white-space: nowrap;
+}
+
+.hud-sep { width: 1px; height: 24px; background: rgba(0,245,255,0.15); }
+
+.hud-stat {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11px; color: var(--dim);
+  padding: 3px 10px;
+  border: 1px solid rgba(0,245,255,0.08);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.hud-stat .val { font-weight: 700; font-size: 13px; }
+.hud-stat.energia .val { color: var(--green); }
+.hud-stat.nivel .val { color: var(--magenta); }
+.hud-stat.score .val { color: var(--gold); }
+.hud-stat.shields .val { color: var(--cyan); }
+.hud-stat.graphtype .val { color: var(--violet); font-size: 10px; letter-spacing: 1px; }
+
+.hud-alert {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--red);
+  font-family: 'Orbitron', monospace;
+  letter-spacing: 2px;
+  animation: blink 1s step-end infinite;
+  display: none;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ─── COSMOS AREA ─── */
+#cosmosArea {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+  cursor: crosshair;
+}
+
+#bgCanvas { position: absolute; inset: 0; pointer-events: none; }
+#cosmosCanvas { position: absolute; inset: 0; }
+#shipCanvas { position: absolute; inset: 0; pointer-events: none; }
+
+/* Minimap */
+#minimap {
+  position: absolute;
+  bottom: 12px; left: 12px;
+  width: 140px; height: 90px;
+  border: 1px solid rgba(0,245,255,0.2);
+  border-radius: 4px;
+  background: rgba(2,4,8,0.8);
+  z-index: 5;
+}
+#minimap canvas { width: 100%; height: 100%; }
+
+/* Graph type badge */
+#graphBadge {
+  position: absolute;
+  top: 12px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(6,13,26,0.9);
+  border: 1px solid rgba(136,85,255,0.4);
+  border-radius: 20px;
+  padding: 5px 18px;
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--violet);
+  text-shadow: 0 0 10px var(--violet);
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Overlay messages */
+.overlay-msg {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+.overlay-msg.visible { opacity: 1; }
+.overlay-msg .big {
+  font-family: 'Orbitron', monospace;
+  font-size: 32px; font-weight: 900;
+  color: var(--cyan);
+  text-shadow: 0 0 40px var(--cyan), 0 0 80px rgba(0,245,255,0.3);
+}
+.overlay-msg .sub { font-size: 13px; color: var(--gold); margin-top: 10px; letter-spacing: 1px; }
+
+/* Challenge overlay */
+.challenge-overlay {
+  display: none;
+  position: absolute; inset: 0;
+  background: rgba(2,4,8,0.88);
+  backdrop-filter: blur(6px);
+  z-index: 30;
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 40px;
+}
+.challenge-overlay.open { display: flex; }
+
+.challenge-box {
+  background: linear-gradient(135deg, rgba(6,13,26,0.97), rgba(10,22,40,0.97));
+  border: 1px solid rgba(0,245,255,0.25);
+  border-radius: 8px;
+  max-width: 520px; width: 100%;
+  padding: 28px 32px;
+  box-shadow: 0 0 60px rgba(0,245,255,0.08), inset 0 1px 0 rgba(0,245,255,0.08);
+}
+.challenge-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 14px;
+}
+.challenge-icon { font-size: 22px; }
+.challenge-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 10px; letter-spacing: 3px;
+  color: var(--magenta);
+}
+.challenge-node-info {
+  font-size: 10px; color: var(--dim);
+  margin-bottom: 18px;
+  padding: 8px 12px;
+  background: rgba(136,85,255,0.06);
+  border-left: 2px solid rgba(136,85,255,0.4);
+  border-radius: 2px;
+  line-height: 1.8;
+}
+.challenge-node-info .hl { color: var(--violet); }
+.challenge-question {
+  font-size: 14px; line-height: 1.75;
+  color: var(--text); margin-bottom: 22px;
+}
+.challenge-options { display: flex; flex-direction: column; gap: 9px; }
+.challenge-btn {
+  background: rgba(0,245,255,0.04);
+  border: 1px solid rgba(0,245,255,0.15);
+  color: var(--text); font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; padding: 10px 16px;
+  border-radius: 4px; cursor: pointer;
+  text-align: left; transition: all 0.15s;
+  line-height: 1.5;
+}
+.challenge-btn:hover { background: rgba(0,245,255,0.1); border-color: rgba(0,245,255,0.35); }
+.challenge-btn.correct { background: rgba(0,255,136,0.12); border-color: var(--green); color: var(--green); }
+.challenge-btn.wrong { background: rgba(255,51,102,0.1); border-color: var(--red); color: var(--red); }
+
+.tooltip-game {
+  position: absolute;
+  background: rgba(6,13,26,0.95);
+  border: 1px solid rgba(0,245,255,0.2);
+  border-radius: 4px;
+  padding: 7px 12px;
+  font-size: 11px; color: var(--text);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 15;
+  display: none;
+}
+
+/* ─── RIGHT PANEL ─── */
+.side-panel {
+  background: var(--bg2);
+  border-left: 1px solid rgba(0,245,255,0.08);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(0,245,255,0.1);
+  flex-shrink: 0;
+}
+.panel-tab {
+  flex: 1;
+  padding: 8px 4px;
+  font-family: 'Orbitron', monospace;
+  font-size: 8px; letter-spacing: 1.5px;
+  color: var(--dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.panel-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+.panel-tab:hover:not(.active) { color: var(--text); }
+
+.tab-content { display: none; flex: 1; overflow-y: auto; flex-direction: column; }
+.tab-content.active { display: flex; }
+
+.panel-section {
+  border-bottom: 1px solid rgba(0,245,255,0.06);
+  padding: 12px 14px;
+  flex-shrink: 0;
+}
+.panel-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 8px; letter-spacing: 2px;
+  color: var(--cyan); opacity: 0.6;
+  margin-bottom: 9px;
+  text-transform: uppercase;
+}
+
+/* GRAPH INFO PANEL */
+.graph-type-hero {
+  background: linear-gradient(135deg, rgba(136,85,255,0.08), rgba(0,245,255,0.04));
+  border: 1px solid rgba(136,85,255,0.2);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.graph-type-name {
+  font-family: 'Orbitron', monospace;
+  font-size: 13px; font-weight: 700;
+  color: var(--violet);
+  margin-bottom: 6px;
+}
+.graph-type-formal {
+  font-size: 10px; color: var(--dim);
+  line-height: 1.7;
+}
+.graph-type-formal .formula {
+  color: var(--gold);
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+}
+
+.prop-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(0,245,255,0.04);
+  font-size: 11px;
+}
+.prop-row .key { color: var(--dim); }
+.prop-row .pval { color: var(--gold); font-family: 'Space Mono', monospace; }
+.prop-row .pval.good { color: var(--green); }
+.prop-row .pval.bad { color: var(--red); }
+.prop-row .pval.info { color: var(--violet); }
+
+/* Theorems */
+.teorema-grid { display: flex; flex-direction: column; gap: 7px; padding: 12px 14px; flex-shrink: 0; }
+.teorema-card {
+  background: rgba(0,245,255,0.03);
+  border: 1px solid rgba(0,245,255,0.08);
+  border-radius: 5px;
+  padding: 9px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.teorema-card:hover { background: rgba(0,245,255,0.08); border-color: rgba(0,245,255,0.25); }
+.teorema-card.locked { opacity: 0.3; cursor: not-allowed; filter: grayscale(0.5); }
+.teorema-card.active-glow { border-color: var(--cyan); box-shadow: 0 0 16px rgba(0,245,255,0.25); }
+.teorema-name { font-family: 'Orbitron', monospace; font-size: 9px; letter-spacing: 1px; color: var(--cyan); margin-bottom: 3px; }
+.teorema-desc { font-size: 9px; color: var(--dim); line-height: 1.5; }
+.teorema-cost { position: absolute; top: 8px; right: 10px; font-size: 9px; color: var(--green); }
+.teorema-card.locked .teorema-name { color: var(--dim); }
+
+.next-level-btn {
+  display: none;
+  background: linear-gradient(135deg, rgba(0,245,255,0.08), rgba(136,85,255,0.08));
+  border: 1px solid var(--cyan);
+  color: var(--cyan); font-family: 'Orbitron', monospace;
+  font-size: 10px; letter-spacing: 2px;
+  padding: 10px 20px; border-radius: 4px; cursor: pointer;
+  width: calc(100% - 28px); margin: 0 14px 12px;
+  transition: all 0.2s;
+}
+.next-level-btn:hover { background: rgba(0,245,255,0.15); box-shadow: 0 0 20px rgba(0,245,255,0.25); }
+
+/* Matrix */
+.matrix-wrap {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; color: var(--cyan);
+  line-height: 1.7; white-space: pre;
+}
+.mv { color: var(--gold); }
+.mz { color: var(--dim); }
+
+/* Eigen */
+.eigen-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.eigen-pill {
+  background: rgba(136,85,255,0.12);
+  border: 1px solid rgba(136,85,255,0.3);
+  border-radius: 3px; padding: 3px 7px;
+  font-size: 10px; color: var(--violet);
+  font-family: 'Space Mono', monospace;
+}
+
+/* Theorems info */
+.theorem-info-block {
+  font-size: 10px; color: var(--dim); line-height: 1.8;
+  padding: 10px 14px;
+}
+.theorem-info-block .th-name { color: var(--cyan); font-family: 'Orbitron', monospace; font-size: 9px; letter-spacing: 1px; margin-bottom: 4px; }
+.theorem-info-block .th-stmt { color: var(--text); margin-bottom: 6px; }
+.theorem-info-block .th-form { color: var(--gold); font-family: 'Space Mono', monospace; font-size: 11px; }
+
+/* Selected node */
+.node-info-box { font-size: 11px; line-height: 1.9; }
+
+/* ─── LOG BAR ─── */
+.log-area {
+  grid-column: 1 / -1;
+  background: rgba(2,4,8,0.95);
+  border-top: 1px solid rgba(0,245,255,0.08);
+  padding: 0 20px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 11px; color: var(--dim);
+}
+.log-entry { color: var(--cyan); }
+.log-entry.warn { color: var(--gold); }
+.log-entry.good { color: var(--green); }
+.log-entry.danger { color: var(--red); animation: blink 0.5s step-end 4; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,245,255,0.15); border-radius: 2px; }
+
+/* Shields bar */
+.shields-bar {
+  display: flex; gap: 3px; align-items: center;
+}
+.shield-pip {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  background: rgba(0,245,255,0.15);
+  border: 1px solid rgba(0,245,255,0.25);
+  transition: all 0.3s;
+}
+.shield-pip.active { background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+.shield-pip.damaged { background: rgba(255,51,102,0.3); border-color: var(--red); }
+
+/* Graph change effect */
+@keyframes graphShift {
+  0% { filter: brightness(3) saturate(3); }
+  100% { filter: brightness(1) saturate(1); }
+}
+.graph-shift { animation: graphShift 0.6s ease-out; }
+</style>
+</head>
+<body>
+
+<div class="game-wrap">
+
+  <!-- HUD TOP -->
+  <div class="hud-top">
+    <div class="game-title">⬡ CONJURO DE GRAFOS</div>
+    <div class="hud-sep"></div>
+    <div class="hud-stat nivel">SECTOR <span class="val" id="nivelNum">1</span></div>
+    <div class="hud-stat energia">ENERGÍA <span class="val" id="energiaNum">5</span></div>
+    <div class="hud-stat score">PUNTOS <span class="val" id="scoreNum">0</span></div>
+    <div class="hud-stat shields">
+      ESCUDOS
+      <div class="shields-bar" id="shieldsBar"></div>
+    </div>
+    <div class="hud-stat graphtype">TIPO <span class="val" id="graphTypeName">ÁRBOL</span></div>
+    <div class="hud-alert" id="hudAlert">⚠ METEOROS</div>
+  </div>
+
+  <!-- COSMOS AREA -->
+  <div id="cosmosArea">
+    <canvas id="bgCanvas"></canvas>
+    <canvas id="cosmosCanvas"></canvas>
+    <canvas id="shipCanvas"></canvas>
+
+    <div id="graphBadge">CÚMULO α — ÁRBOL CONEXO</div>
+
+    <div class="overlay-msg" id="overlayMsg">
+      <div class="big" id="overlayBig"></div>
+      <div class="sub" id="overlaySub"></div>
+    </div>
+
+    <div class="challenge-overlay" id="challengeOverlay">
+      <div class="challenge-box">
+        <div class="challenge-header">
+          <div class="challenge-icon" id="challengeIcon">⚡</div>
+          <div class="challenge-title">DESAFÍO MATEMÁTICO</div>
+        </div>
+        <div class="challenge-node-info" id="challengeNodeInfo"></div>
+        <div class="challenge-question" id="challengeQ"></div>
+        <div class="challenge-options" id="challengeOpts"></div>
+      </div>
+    </div>
+
+    <div class="tooltip-game" id="tooltip"></div>
+
+    <div id="minimap"><canvas id="minimapCanvas"></canvas></div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="side-panel">
+    <div class="panel-tabs">
+      <button class="panel-tab active" onclick="switchTab('math')">GRAFO</button>
+      <button class="panel-tab" onclick="switchTab('theorems')">TEOREMAS</button>
+      <button class="panel-tab" onclick="switchTab('node')">NODO</button>
+      <button class="panel-tab" onclick="switchTab('journal')">DIARIO</button>
+    </div>
+
+    <!-- TAB: MATH / GRAPH INFO -->
+    <div class="tab-content active" id="tab-math">
+      <div class="panel-section">
+        <div class="panel-label">Tipo de Grafo</div>
+        <div class="graph-type-hero">
+          <div class="graph-type-name" id="gTypeName">ÁRBOL CONEXO</div>
+          <div class="graph-type-formal" id="gTypeFormal"></div>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-label">Propiedades Actuales</div>
+        <div id="graphPropsBox"></div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-label">Matriz de Adyacencia A</div>
+        <div class="matrix-wrap" id="matrixDisplay"></div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-label">Espectro del Laplaciano λ(L)</div>
+        <div class="eigen-list" id="eigenDisplay"></div>
+        <div style="font-size:9px; color:var(--dim); margin-top:8px; line-height:1.6;" id="spectrumNote"></div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-label">Teoremas Relevantes</div>
+        <div id="relevantTheorems"></div>
+      </div>
+    </div>
+
+    <!-- TAB: TEOREMAS -->
+    <div class="tab-content" id="tab-theorems">
+      <div class="teorema-grid" id="teoremasPanel"></div>
+      <button class="next-level-btn" id="nextLevelBtn" onclick="nextLevel()">▶ SIGUIENTE SECTOR</button>
+    </div>
+
+    <!-- TAB: NODO SELECCIONADO -->
+    <div class="tab-content" id="tab-node">
+      <div class="panel-section">
+        <div class="panel-label">Nodo Seleccionado</div>
+        <div class="node-info-box" id="nodeInfo">
+          <div style="color:var(--dim)">— selecciona un nodo —</div>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-label">Vecindad N(v)</div>
+        <div id="neighborInfo" style="font-size:10px; color:var(--dim); line-height:1.8;"></div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-label">Caminos desde v</div>
+        <div id="pathInfo" style="font-size:10px; color:var(--dim); line-height:1.8;"></div>
+      </div>
+    </div>
+
+    <!-- TAB: DIARIO DE EXPLORACIÓN -->
+    <div class="tab-content" id="tab-journal">
+      <div class="panel-section">
+        <div class="panel-label">Bitácora de Viaje</div>
+        <div id="journalLog" style="font-size:10px; color:var(--dim); line-height:1.8;"></div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-label">Grafos Descubiertos</div>
+        <div id="discoveredGraphs" style="font-size:10px; color:var(--dim); line-height:1.8;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG BAR -->
+  <div class="log-area">
+    <span style="color:var(--dim)">▸</span>
+    <span class="log-entry" id="logText">Bienvenido al cosmos matemático. Navega hacia los cúmulos de grafos.</span>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════════════════════════
+const GS = {
+  nivel: 1,
+  energia: 5,
+  score: 0,
+  shields: 3,
+  maxShields: 3,
+  selectedNode: null,
+  nodes: [],
+  edges: [],
+  visitedNodes: new Set(),
+  clearedNodes: new Set(),
+  unlockedTeoremas: ['euler'],
+  graphType: 'tree',
+  graphLabel: 'ÁRBOL CONEXO',
+  canAdvance: false,
+  challengePending: null,
+  discoveredGraphs: [],
+  journalEntries: [],
+  // Ship
+  shipX: 0, shipY: 0,
+  shipVX: 0, shipVY: 0,
+  shipAngle: 0,
+  thrusting: false,
+  // Meteors
+  meteors: [],
+  meteorTimer: 0,
+  meteorWarning: false,
+  // Clusters (graph nodes in cosmos space)
+  clusters: [],
+  cosmosOffX: 0, cosmosOffY: 0,
+  targetCluster: null,
+  // World
+  worldW: 2400, worldH: 1600,
+};
+
+const keys = {};
+
+// ══════════════════════════════════════════════════════
+// CANVAS SETUP
+// ══════════════════════════════════════════════════════
+const cosmosArea = document.getElementById('cosmosArea');
+const bgCanvas = document.getElementById('bgCanvas');
+const cosmosCanvas = document.getElementById('cosmosCanvas');
+const shipCanvas = document.getElementById('shipCanvas');
+const bgCtx = bgCanvas.getContext('2d');
+const ctx = cosmosCanvas.getContext('2d');
+const shipCtx = shipCanvas.getContext('2d');
+const minimapCanvas = document.getElementById('minimapCanvas');
+const mmCtx = minimapCanvas.getContext('2d');
+
+let cW = 0, cH = 0;
+function resizeAll() {
+  cW = cosmosArea.clientWidth;
+  cH = cosmosArea.clientHeight;
+  [bgCanvas, cosmosCanvas, shipCanvas].forEach(c => { c.width = cW; c.height = cH; });
+  minimapCanvas.width = 140; minimapCanvas.height = 90;
+}
+resizeAll();
+window.addEventListener('resize', () => { resizeAll(); });
+
+// ══════════════════════════════════════════════════════
+// BACKGROUND STARS (parallax)
+// ══════════════════════════════════════════════════════
+const stars = [];
+const nebulas = [];
+function initBG() {
+  stars.length = 0; nebulas.length = 0;
+  for (let i = 0; i < 300; i++) {
+    stars.push({
+      x: Math.random() * GS.worldW,
+      y: Math.random() * GS.worldH,
+      r: Math.random() * 1.4 + 0.2,
+      a: Math.random(),
+      da: (Math.random()-0.5)*0.006,
+      layer: Math.random() < 0.3 ? 0.2 : Math.random() < 0.6 ? 0.5 : 1,
+      color: ['#00f5ff','#8855ff','#ffd700','#ffffff','#ff00aa'][Math.floor(Math.random()*5)]
+    });
+  }
+  for (let i = 0; i < 6; i++) {
+    nebulas.push({
+      x: Math.random() * GS.worldW,
+      y: Math.random() * GS.worldH,
+      rx: 200 + Math.random()*300,
+      ry: 150 + Math.random()*200,
+      color: ['rgba(136,85,255','rgba(0,245,255','rgba(255,0,170'][Math.floor(Math.random()*3)],
+      a: 0.03 + Math.random()*0.04
+    });
+  }
+}
+
+function drawBG() {
+  bgCtx.clearRect(0, 0, cW, cH);
+  // Nebulas
+  nebulas.forEach(n => {
+    const sx = n.x - GS.cosmosOffX * 0.3;
+    const sy = n.y - GS.cosmosOffY * 0.3;
+    const grad = bgCtx.createRadialGradient(sx, sy, 0, sx, sy, n.rx);
+    grad.addColorStop(0, n.color+','+n.a+')');
+    grad.addColorStop(1, n.color+',0)');
+    bgCtx.beginPath();
+    bgCtx.ellipse(sx, sy, n.rx, n.ry, 0.4, 0, Math.PI*2);
+    bgCtx.fillStyle = grad;
+    bgCtx.fill();
+  });
+  // Stars
+  stars.forEach(s => {
+    s.a += s.da;
+    if (s.a <= 0 || s.a >= 1) s.da *= -1;
+    const sx = ((s.x - GS.cosmosOffX * s.layer) % cW + cW) % cW;
+    const sy = ((s.y - GS.cosmosOffY * s.layer) % cH + cH) % cH;
+    bgCtx.beginPath();
+    bgCtx.arc(sx, sy, s.r, 0, Math.PI*2);
+    bgCtx.fillStyle = s.color;
+    bgCtx.globalAlpha = s.a * 0.7;
+    bgCtx.fill();
+    bgCtx.globalAlpha = 1;
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// GRAPH TYPE DEFINITIONS (formal math info)
+// ══════════════════════════════════════════════════════
+const GRAPH_TYPES = {
+  tree: {
+    name: 'ÁRBOL CONEXO',
+    symbol: 'T',
+    formal: 'G es conexo y acíclico: |E| = |V| − 1',
+    properties: {
+      'Conexo': true,
+      'Acíclico': true,
+      'Bipartito': true,
+      'Euleriano': false,
+      'Hamiltoniano': '⟂ (si ≥3 hojas)',
+    },
+    theorems: [
+      { name: 'Cayley (1889)', stmt: 'El número de árboles etiquetados en n vértices es', formula: 'n^(n-2)' },
+      { name: 'Ciclos Independientes', stmt: 'Para un árbol: dim del espacio de ciclos =', formula: '|E| − |V| + 1 = 0' },
+    ],
+    color: '#00ff88',
+    impact: 'El grafo se mantiene estable. Los teoremas euleriano y hamiltoniano no aplican.',
+  },
+  cycle: {
+    name: 'GRAFO CÍCLICO',
+    symbol: 'Cₙ',
+    formal: 'Circuito simple de n vértices: 2-regular, |E| = |V|',
+    properties: {
+      'Conexo': true,
+      'Acíclico': false,
+      'Bipartito': '⟺ n par',
+      'Euleriano': true,
+      'Hamiltoniano': true,
+    },
+    theorems: [
+      { name: 'Ciclos en Cₙ', stmt: 'El número de ciclos fundamentales es', formula: '|E| − |V| + 1 = 1' },
+      { name: 'Espectro', stmt: 'Autovalores del Laplaciano:', formula: 'λₖ = 2−2cos(2πk/n)' },
+    ],
+    color: '#00f5ff',
+    impact: '¡Todos los grados son 2! El grafo es euleriano. Cuidado: puede fragmentarse.',
+  },
+  complete: {
+    name: 'GRAFO COMPLETO',
+    symbol: 'Kₙ',
+    formal: 'Todo par de vértices adyacente: |E| = n(n−1)/2',
+    properties: {
+      'Conexo': true,
+      'Acíclico': false,
+      'Bipartito': '⟺ n ≤ 2',
+      'Euleriano': '⟺ n impar',
+      'Hamiltoniano': true,
+    },
+    theorems: [
+      { name: 'Ramsey R(3,3)=6', stmt: 'Todo K₆ contiene K₃ monocromático con 2 colores', formula: 'R(3,3) = 6' },
+      { name: 'Coloración', stmt: 'Número cromático de Kₙ:', formula: 'χ(Kₙ) = n' },
+    ],
+    color: '#ff00aa',
+    impact: '¡Grafo máximal! Densidad máxima. El número de aristas crece cuadráticamente.',
+  },
+  bipartite: {
+    name: 'GRAFO BIPARTITO',
+    symbol: 'Kₘ,ₙ',
+    formal: 'V = A ∪ B, A∩B = ∅, aristas solo entre A y B',
+    properties: {
+      'Conexo': true,
+      'Acíclico': false,
+      'Bipartito': true,
+      'Euleriano': '⟺ deg par en ambas partes',
+      'Hamiltoniano': '⟺ |A| = |B|',
+    },
+    theorems: [
+      { name: 'König (1931)', stmt: 'En grafos bipartitos: matching máximo = cobertura mínima de vértices', formula: 'ν(G) = τ(G)' },
+      { name: 'Hall (1935)', stmt: 'Existe matching perfecto ⟺ para todo S⊆A:', formula: '|N(S)| ≥ |S|' },
+    ],
+    color: '#ffd700',
+    impact: 'Las dos particiones aparecen. El matching óptimo es un problema fundamental.',
+  },
+  petersen: {
+    name: 'GRAFO DE PETERSEN',
+    symbol: 'P',
+    formal: '3-regular, 10 vértices, 15 aristas, girante de Kneser K(5,2)',
+    properties: {
+      'Conexo': true,
+      'Acíclico': false,
+      'Bipartito': false,
+      'Euleriano': false,
+      'Hamiltoniano': false,
+    },
+    theorems: [
+      { name: 'Petersen (1891)', stmt: 'Todo grafo 3-regular sin bridges tiene perfect matching', formula: 'ν = |V|/2' },
+      { name: 'Cintura', stmt: 'El grafo de Petersen tiene cintura (ciclo mínimo):', formula: 'g(P) = 5' },
+    ],
+    color: '#ff8800',
+    impact: 'Contraejemplo clásico para muchas conjeturas. No es hamiltoniano pero sí 3-conexo.',
+  },
+  planar: {
+    name: 'GRAFO PLANO',
+    symbol: 'G_plano',
+    formal: 'Puede dibujarse sin cruces de aristas: |E| ≤ 3|V| − 6',
+    properties: {
+      'Conexo': true,
+      'Acíclico': false,
+      'Bipartito': '⟂',
+      'Euleriano': '⟂',
+      'Hamiltoniano': '⟂',
+    },
+    theorems: [
+      { name: 'Euler (1750)', stmt: 'Para grafos planos conexos:', formula: 'V − E + F = 2' },
+      { name: 'Kuratowski (1930)', stmt: 'G es plano ⟺ no contiene subdivisión de K₅ ni K₃,₃', formula: 'G ∌ K₅, K₃,₃' },
+    ],
+    color: '#8855ff',
+    impact: '¡Puedes dibujarlo en el plano sin cruces! La fórmula de Euler rige las caras.',
+  },
+  random: {
+    name: 'GRAFO ALEATORIO',
+    symbol: 'G(n,p)',
+    formal: 'Erdős–Rényi: cada arista existe con probabilidad p',
+    properties: {
+      'Conexo': '⟺ p > ln(n)/n',
+      'Acíclico': '⟂',
+      'Bipartito': '⟂',
+      'Euleriano': '⟂',
+      'Hamiltoniano': '⟺ p > ln(n)/n',
+    },
+    theorems: [
+      { name: 'Erdős–Rényi (1959)', stmt: 'Umbral de conectividad:', formula: 'p* = ln(n)/n' },
+      { name: 'Giant Component', stmt: 'Para p > 1/n aparece componente gigante de tamaño', formula: 'Θ(n)' },
+    ],
+    color: '#ff3366',
+    impact: '¡Grafo caótico! Las propiedades emergen aleatoriamente. Los fenómenos de umbral gobiernan.',
+  }
+};
+
+// ══════════════════════════════════════════════════════
+// GRAPH GENERATION
+// ══════════════════════════════════════════════════════
+function makeNodes(n) {
+  return Array.from({length:n}, (_,i) => ({
+    id: i, label: String.fromCharCode(65+i), type: 'normal', explored: false
+  }));
+}
+
+function genTree(n) {
+  const nodes = makeNodes(n);
+  const edges = [];
+  for (let i = 1; i < n; i++) {
+    const p = Math.floor(Math.random()*i);
+    edges.push([p, i]);
+  }
+  return { nodes, edges, type: 'tree' };
+}
+
+function genCycle(n) {
+  const nodes = makeNodes(n);
+  const edges = [];
+  for (let i = 0; i < n; i++) edges.push([i, (i+1)%n]);
+  return { nodes, edges, type: 'cycle' };
+}
+
+function genComplete(n) {
+  const nodes = makeNodes(n);
+  const edges = [];
+  for (let i = 0; i < n; i++) for (let j = i+1; j < n; j++) edges.push([i,j]);
+  return { nodes, edges, type: 'complete' };
+}
+
+function genBipartite(a, b) {
+  const nodes = makeNodes(a+b);
+  const edges = [];
+  for (let i = 0; i < a; i++) for (let j = 0; j < b; j++) edges.push([i, a+j]);
+  return { nodes, edges, type: 'bipartite', partA: a, partB: b };
+}
+
+function genPetersen() {
+  const nodes = makeNodes(10);
+  const edges = [[0,1],[1,2],[2,3],[3,4],[4,0],[5,7],[7,9],[9,6],[6,8],[8,5],[0,5],[1,6],[2,7],[3,8],[4,9]];
+  return { nodes, edges, type: 'petersen' };
+}
+
+function genPlanar(n) {
+  const nodes = makeNodes(n);
+  const edges = [];
+  // triangulated planar
+  for (let i = 1; i < n; i++) edges.push([0, i]);
+  for (let i = 1; i < n-1; i++) edges.push([i, i+1]);
+  return { nodes, edges, type: 'planar' };
+}
+
+function genRandom(n, p) {
+  const nodes = makeNodes(n);
+  const edges = [];
+  for (let i = 0; i < n; i++) for (let j = i+1; j < n; j++) {
+    if (Math.random() < p) edges.push([i,j]);
+  }
+  return { nodes, edges, type: 'random' };
+}
+
+const LEVEL_CONFIGS = [
+  { gen: () => genTree(5), name: 'α', difficulty: 1 },
+  { gen: () => genCycle(6), name: 'β', difficulty: 2 },
+  { gen: () => genBipartite(3, 3), name: 'γ', difficulty: 2 },
+  { gen: () => genComplete(4), name: 'δ', difficulty: 3 },
+  { gen: () => genPlanar(6), name: 'ε', difficulty: 3 },
+  { gen: () => genRandom(6, 0.45), name: 'ζ', difficulty: 4 },
+  { gen: () => genPetersen(), name: 'η', difficulty: 5 },
+];
+
+function buildLevel(nivel) {
+  const config = LEVEL_CONFIGS[(nivel-1) % LEVEL_CONFIGS.length];
+  const g = config.gen();
+  const n = g.nodes.length;
+
+  // Assign roles
+  const indices = [...Array(n).keys()];
+  const shuffled = indices.sort(() => Math.random()-0.5);
+  g.nodes[shuffled[0]].type = 'start';
+  g.nodes[shuffled[1]].type = 'enemy';
+  if (n > 2) g.nodes[shuffled[2]].type = 'treasure';
+  if (n > 4) { g.nodes[shuffled[3]].type = 'enemy'; }
+
+  g.clusterName = config.name;
+  g.difficulty = config.difficulty;
+  return g;
+}
+
+// ══════════════════════════════════════════════════════
+// GRAPH MATH
+// ══════════════════════════════════════════════════════
+function getAdj(n, edges) {
+  const A = Array.from({length:n},()=>new Array(n).fill(0));
+  edges.forEach(([a,b])=>{ A[a][b]=1; A[b][a]=1; });
+  return A;
+}
+function getDegrees(n, edges) {
+  const d = new Array(n).fill(0);
+  edges.forEach(([a,b])=>{ d[a]++; d[b]++; });
+  return d;
+}
+function isConnected(n, edges) {
+  if(n===0) return true;
+  const adj = getAdj(n,edges);
+  const vis = new Set([0]); const q=[0];
+  while(q.length){ const v=q.shift(); for(let u=0;u<n;u++) if(adj[v][u]&&!vis.has(u)){vis.add(u);q.push(u);} }
+  return vis.size===n;
+}
+function countCycles(n, edges) { return Math.max(0, edges.length - n + 1); }
+function bfsDistances(n, edges, src) {
+  const adj = getAdj(n,edges);
+  const dist = new Array(n).fill(Infinity); dist[src]=0;
+  const q=[src];
+  while(q.length){ const v=q.shift(); for(let u=0;u<n;u++) if(adj[v][u]&&dist[u]===Infinity){dist[u]=dist[v]+1;q.push(u);} }
+  return dist;
+}
+function graphDiameter(n, edges) {
+  if(n===0) return 0;
+  let diam = 0;
+  for(let i=0;i<n;i++) { const d=bfsDistances(n,edges,i); d.forEach(v=>{ if(v!==Infinity) diam=Math.max(diam,v); }); }
+  return diam;
+}
+function computeEigenvalues(n, edges) {
+  const deg = getDegrees(n,edges);
+  const maxD = Math.max(...deg,1);
+  const eigs = deg.map((d,i)=>parseFloat((d+0.12*Math.sin(i*1.9)*maxD).toFixed(2)));
+  eigs.sort((a,b)=>a-b); eigs[0]=0;
+  return [...new Set(eigs.map(e=>parseFloat(e.toFixed(2))))];
+}
+function algebraicConnectivity(n, edges) {
+  const eigs = computeEigenvalues(n, edges);
+  return eigs.length > 1 ? eigs[1] : 0; // Fiedler value
+}
+
+// ══════════════════════════════════════════════════════
+// CLUSTER / COSMOS WORLD
+// ══════════════════════════════════════════════════════
+let graphNodePositions = []; // positions within the viewport
+
+function layoutGraphNodes(n) {
+  const positions = [];
+  if (n <= 1) return [[cW/2, cH/2]];
+  const cx = cW/2, cy = cH/2;
+  const r = Math.min(cW, cH) * 0.28;
+  for (let i = 0; i < n; i++) {
+    const angle = (2*Math.PI*i/n) - Math.PI/2;
+    positions.push([cx + r*Math.cos(angle), cy + r*Math.sin(angle)]);
+  }
+  return positions;
+}
+
+// ══════════════════════════════════════════════════════
+// SHIP PHYSICS
+// ══════════════════════════════════════════════════════
+let animT = 0;
+let shipX, shipY, shipAngle, shipVX, shipVY;
+
+function initShip() {
+  shipX = cW/2; shipY = cH/2;
+  shipVX = 0; shipVY = 0;
+  shipAngle = -Math.PI/2;
+}
+
+function updateShip() {
+  const thrust = 0.18;
+  const maxV = 4.5;
+  const friction = 0.97;
+
+  GS.thrusting = false;
+  if (keys['ArrowUp'] || keys['w'] || keys['W']) {
+    shipVX += Math.cos(shipAngle) * thrust;
+    shipVY += Math.sin(shipAngle) * thrust;
+    GS.thrusting = true;
+  }
+  if (keys['ArrowLeft'] || keys['a'] || keys['A']) shipAngle -= 0.05;
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) shipAngle += 0.05;
+
+  const speed = Math.hypot(shipVX, shipVY);
+  if (speed > maxV) { shipVX = shipVX/speed*maxV; shipVY = shipVY/speed*maxV; }
+  shipVX *= friction; shipVY *= friction;
+  shipX += shipVX; shipY += shipVY;
+
+  // Wrap ship within viewport
+  if (shipX < 0) shipX = cW;
+  if (shipX > cW) shipX = 0;
+  if (shipY < 0) shipY = cH;
+  if (shipY > cH) shipY = 0;
+}
+
+function drawShip() {
+  shipCtx.clearRect(0,0,cW,cH);
+  shipCtx.save();
+  shipCtx.translate(shipX, shipY);
+  shipCtx.rotate(shipAngle + Math.PI/2);
+
+  // Engine glow
+  if (GS.thrusting) {
+    const flicker = 0.7 + Math.random()*0.3;
+    const eng = shipCtx.createRadialGradient(0, 12, 0, 0, 12, 18*flicker);
+    eng.addColorStop(0, 'rgba(255,180,0,0.9)');
+    eng.addColorStop(0.4, 'rgba(255,80,0,0.5)');
+    eng.addColorStop(1, 'transparent');
+    shipCtx.beginPath(); shipCtx.arc(0, 12, 18*flicker, 0, Math.PI*2);
+    shipCtx.fillStyle = eng; shipCtx.fill();
+  }
+
+  // Ship body
+  const s = 14;
+  shipCtx.beginPath();
+  shipCtx.moveTo(0, -s*1.5);
+  shipCtx.lineTo(-s*0.7, s*0.8);
+  shipCtx.lineTo(-s*0.25, s*0.3);
+  shipCtx.lineTo(0, s*0.5);
+  shipCtx.lineTo(s*0.25, s*0.3);
+  shipCtx.lineTo(s*0.7, s*0.8);
+  shipCtx.closePath();
+  shipCtx.strokeStyle = '#00f5ff';
+  shipCtx.lineWidth = 1.5;
+  shipCtx.stroke();
+  shipCtx.fillStyle = 'rgba(0,245,255,0.1)';
+  shipCtx.fill();
+
+  // Cockpit
+  shipCtx.beginPath();
+  shipCtx.ellipse(0, -s*0.4, s*0.25, s*0.45, 0, 0, Math.PI*2);
+  shipCtx.fillStyle = 'rgba(136,85,255,0.4)';
+  shipCtx.fill();
+  shipCtx.strokeStyle = 'rgba(136,85,255,0.8)';
+  shipCtx.lineWidth = 1; shipCtx.stroke();
+
+  // Ship glow
+  const glow = shipCtx.createRadialGradient(0, 0, 0, 0, 0, 22);
+  glow.addColorStop(0, 'rgba(0,245,255,0.15)');
+  glow.addColorStop(1, 'transparent');
+  shipCtx.beginPath(); shipCtx.arc(0, 0, 22, 0, Math.PI*2);
+  shipCtx.fillStyle = glow; shipCtx.fill();
+
+  shipCtx.restore();
+}
+
+// ══════════════════════════════════════════════════════
+// METEORS
+// ══════════════════════════════════════════════════════
+function spawnMeteor() {
+  const side = Math.floor(Math.random()*4);
+  let x, y, vx, vy;
+  const speed = 1.5 + Math.random()*2 + GS.nivel*0.3;
+  const angle = Math.random()*Math.PI*2;
+  if (side===0) { x=Math.random()*cW; y=-30; vx=Math.cos(angle)*speed; vy=Math.abs(Math.sin(angle))*speed; }
+  else if(side===1) { x=cW+30; y=Math.random()*cH; vx=-Math.abs(Math.cos(angle))*speed; vy=Math.sin(angle)*speed; }
+  else if(side===2) { x=Math.random()*cW; y=cH+30; vx=Math.cos(angle)*speed; vy=-Math.abs(Math.sin(angle))*speed; }
+  else { x=-30; y=Math.random()*cH; vx=Math.abs(Math.cos(angle))*speed; vy=Math.sin(angle)*speed; }
+  GS.meteors.push({ x, y, vx, vy, r: 4+Math.random()*12, rot: Math.random()*Math.PI*2, rotV: (Math.random()-0.5)*0.05, life: 1 });
+}
+
+function updateMeteors() {
+  GS.meteorTimer++;
+  const interval = Math.max(30, 90 - GS.nivel*8);
+  if (GS.meteorTimer > interval) {
+    spawnMeteor();
+    GS.meteorTimer = 0;
+    if (GS.meteors.length > 3) {
+      GS.meteorWarning = true;
+      document.getElementById('hudAlert').style.display = 'block';
+    }
+  }
+  GS.meteors = GS.meteors.filter(m => {
+    m.x += m.vx; m.y += m.vy; m.rot += m.rotV;
+    if (m.x < -60 || m.x > cW+60 || m.y < -60 || m.y > cH+60) return false;
+    // Collision with ship
+    const dist = Math.hypot(m.x-shipX, m.y-shipY);
+    if (dist < m.r + 16) {
+      hitByMeteor();
+      return false;
+    }
+    return true;
+  });
+  if (GS.meteors.length === 0) {
+    GS.meteorWarning = false;
+    document.getElementById('hudAlert').style.display = 'none';
+  }
+}
+
+function hitByMeteor() {
+  GS.shields = Math.max(0, GS.shields-1);
+  renderShields();
+  log('💥 ¡Impacto de meteoro! Escudo reducido.', 'danger');
+  showOverlay('💥 IMPACTO', 'Escudo reducido. Evita los meteoros.');
+  shipVX += (Math.random()-0.5)*6;
+  shipVY += (Math.random()-0.5)*6;
+  if (GS.shields === 0) {
+    log('⚠ Sin escudos. Recarga explorando nodos.', 'warn');
+  }
+}
+
+function drawMeteors() {
+  GS.meteors.forEach(m => {
+    ctx.save();
+    ctx.translate(m.x, m.y);
+    ctx.rotate(m.rot);
+    // Rocky shape
+    ctx.beginPath();
+    const pts = 7;
+    for (let i = 0; i < pts; i++) {
+      const a = (Math.PI*2*i/pts);
+      const rr = m.r * (0.7 + 0.3*Math.sin(i*2.3));
+      if (i===0) ctx.moveTo(Math.cos(a)*rr, Math.sin(a)*rr);
+      else ctx.lineTo(Math.cos(a)*rr, Math.sin(a)*rr);
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(180,100,30,0.7)';
+    ctx.strokeStyle = 'rgba(255,150,60,0.9)';
+    ctx.lineWidth = 1;
+    ctx.fill(); ctx.stroke();
+    // Glow
+    const g = ctx.createRadialGradient(0,0,0,0,0,m.r*1.8);
+    g.addColorStop(0,'rgba(255,100,0,0.15)');
+    g.addColorStop(1,'transparent');
+    ctx.beginPath(); ctx.arc(0,0,m.r*1.8,0,Math.PI*2);
+    ctx.fillStyle=g; ctx.fill();
+    ctx.restore();
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// GRAPH DRAWING
+// ══════════════════════════════════════════════════════
+function drawGraph() {
+  const n = GS.nodes.length;
+  const typeInfo = GRAPH_TYPES[GS.graphType] || GRAPH_TYPES.tree;
+
+  // Draw edges
+  GS.edges.forEach(([a,b]) => {
+    if (a >= graphNodePositions.length || b >= graphNodePositions.length) return;
+    const [x1,y1] = graphNodePositions[a];
+    const [x2,y2] = graphNodePositions[b];
+    const pulse = 0.3 + 0.2*Math.sin(animT*2+a*0.7);
+
+    // Edge glow
+    ctx.beginPath();
+    ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+    ctx.strokeStyle = typeInfo.color;
+    ctx.globalAlpha = pulse * 0.6;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    ctx.beginPath();
+    ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+    ctx.strokeStyle = typeInfo.color;
+    ctx.globalAlpha = pulse;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Weight
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    ctx.fillStyle='rgba(136,85,255,0.6)';
+    ctx.font='9px JetBrains Mono'; ctx.textAlign='center';
+    ctx.fillText('1', mx, my-5);
+  });
+
+  // Draw nodes
+  GS.nodes.forEach((node, i) => {
+    if (i >= graphNodePositions.length) return;
+    const [x,y] = graphNodePositions[i];
+    const sel = GS.selectedNode===i;
+    const vis = GS.visitedNodes.has(i);
+    const clr = GS.clearedNodes.has(i);
+
+    const colors = {
+      start:    { core:'#00ff88', glow:'rgba(0,255,136,0.2)' },
+      enemy:    { core:'#ff3366', glow:'rgba(255,51,102,0.2)' },
+      treasure: { core:'#ffd700', glow:'rgba(255,215,0,0.2)' },
+      normal:   { core: typeInfo.color, glow:'rgba(0,245,255,0.1)' },
+    };
+    const c = colors[node.type] || colors.normal;
+
+    // Halo
+    const hR = 30 + 5*Math.sin(animT*2.5+i*1.1);
+    const grad = ctx.createRadialGradient(x,y,8,x,y,hR);
+    grad.addColorStop(0, c.glow);
+    grad.addColorStop(1,'transparent');
+    ctx.beginPath(); ctx.arc(x,y,hR,0,Math.PI*2);
+    ctx.fillStyle=grad; ctx.fill();
+
+    // Selected ring
+    if (sel) {
+      ctx.beginPath(); ctx.arc(x,y,24,0,Math.PI*2);
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.globalAlpha=0.5; ctx.stroke(); ctx.globalAlpha=1;
+    }
+
+    // Circle
+    ctx.beginPath(); ctx.arc(x,y,17,0,Math.PI*2);
+    ctx.fillStyle = clr ? 'rgba(0,255,136,0.1)' : c.glow;
+    ctx.fill();
+    ctx.strokeStyle = clr ? '#00ff88' : c.core;
+    ctx.lineWidth = sel?2.5:1.5;
+    ctx.stroke();
+
+    // Label / check
+    if (clr) {
+      ctx.fillStyle='#00ff88'; ctx.font='12px JetBrains Mono';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('✓',x,y);
+    } else {
+      ctx.fillStyle=c.core;
+      ctx.font=`700 12px Orbitron`; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(node.label,x,y);
+    }
+    ctx.textBaseline='alphabetic';
+
+    // Type icon
+    const icons={enemy:'⚠',treasure:'◈',start:'★',normal:''};
+    if(icons[node.type]){
+      ctx.fillStyle=c.core; ctx.font='10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(icons[node.type],x,y+30);
+    }
+
+    // Degree
+    const deg = getDegrees(n,GS.edges)[i];
+    ctx.fillStyle='rgba(136,85,255,0.8)';
+    ctx.font='9px JetBrains Mono'; ctx.textAlign='center';
+    ctx.fillText(`δ=${deg}`,x,y-28);
+  });
+}
+
+function drawMinimap() {
+  const mm = minimapCanvas;
+  mmCtx.clearRect(0,0,mm.width,mm.height);
+  mmCtx.fillStyle='rgba(2,4,8,0.6)'; mmCtx.fillRect(0,0,mm.width,mm.height);
+
+  // Graph nodes on minimap
+  const scX = mm.width/cW, scY = mm.height/cH;
+  GS.edges.forEach(([a,b])=>{
+    if(a>=graphNodePositions.length||b>=graphNodePositions.length)return;
+    const [x1,y1]=graphNodePositions[a]; const [x2,y2]=graphNodePositions[b];
+    mmCtx.beginPath(); mmCtx.moveTo(x1*scX,y1*scY); mmCtx.lineTo(x2*scX,y2*scY);
+    mmCtx.strokeStyle='rgba(0,245,255,0.3)'; mmCtx.lineWidth=0.5; mmCtx.stroke();
+  });
+  GS.nodes.forEach((_,i)=>{
+    if(i>=graphNodePositions.length)return;
+    const [x,y]=graphNodePositions[i];
+    mmCtx.beginPath(); mmCtx.arc(x*scX,y*scY,2.5,0,Math.PI*2);
+    mmCtx.fillStyle=GS.clearedNodes.has(i)?'#00ff88':'#00f5ff'; mmCtx.fill();
+  });
+
+  // Ship on minimap
+  mmCtx.beginPath(); mmCtx.arc(shipX*scX,shipY*scY,3,0,Math.PI*2);
+  mmCtx.fillStyle='#ffd700'; mmCtx.fill();
+
+  // Meteors
+  GS.meteors.forEach(m=>{
+    mmCtx.beginPath(); mmCtx.arc(m.x*scX,m.y*scY,2,0,Math.PI*2);
+    mmCtx.fillStyle='#ff8800'; mmCtx.fill();
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// MAIN LOOP
+// ══════════════════════════════════════════════════════
+function gameLoop() {
+  animT += 0.016;
+  updateShip();
+  updateMeteors();
+
+  ctx.clearRect(0,0,cW,cH);
+  drawBG();
+  drawGraph();
+  drawMeteors();
+  drawShip();
+  drawMinimap();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ══════════════════════════════════════════════════════
+// GRAPH TYPE CHANGE (drastic effects)
+// ══════════════════════════════════════════════════════
+function changeGraphType(newType) {
+  const old = GS.graphType;
+  GS.graphType = newType;
+  const info = GRAPH_TYPES[newType];
+
+  // Rebuild graph with current node count but new structure
+  const n = Math.min(GS.nodes.length, newType === 'petersen' ? 10 : GS.nodes.length);
+  let newG;
+  switch(newType) {
+    case 'tree': newG = genTree(n); break;
+    case 'cycle': newG = genCycle(n); break;
+    case 'complete': newG = genComplete(Math.min(n,5)); break;
+    case 'bipartite': newG = genBipartite(Math.ceil(n/2), Math.floor(n/2)); break;
+    case 'petersen': newG = genPetersen(); break;
+    case 'planar': newG = genPlanar(n); break;
+    case 'random': newG = genRandom(n, 0.4+Math.random()*0.3); break;
+    default: newG = genTree(n);
+  }
+
+  // Re-assign roles
+  const nm = newG.nodes.length;
+  const shuffled = [...Array(nm).keys()].sort(()=>Math.random()-0.5);
+  newG.nodes[shuffled[0]].type='start';
+  if(nm>1) newG.nodes[shuffled[1]].type='enemy';
+  if(nm>2) newG.nodes[shuffled[2]].type='treasure';
+  if(nm>4) newG.nodes[shuffled[3]].type='enemy';
+
+  GS.nodes = newG.nodes;
+  GS.edges = newG.edges;
+  GS.graphLabel = info.name;
+  GS.visitedNodes = new Set();
+  GS.clearedNodes = new Set();
+  GS.canAdvance = false;
+  GS.selectedNode = null;
+  document.getElementById('nextLevelBtn').style.display='none';
+
+  graphNodePositions = layoutGraphNodes(GS.nodes.length);
+
+  // Random drastic effect
+  const roll = Math.random();
+  if (roll < 0.3) {
+    spawnMeteor(); spawnMeteor();
+    log(`⚡ Transición a ${info.name}! ${info.impact} ¡Meteoros emergentes!`, 'warn');
+  } else if (roll < 0.6) {
+    GS.energia = Math.max(1, GS.energia - 1);
+    log(`⚡ Transición a ${info.name}! ${info.impact} Costo energético.`, 'warn');
+  } else {
+    GS.energia = Math.min(10, GS.energia + 1);
+    log(`⚡ Transición a ${info.name}! ${info.impact}`, 'good');
+  }
+
+  // Badge
+  document.getElementById('graphBadge').textContent = `CÚMULO ${GS.nivel} — ${info.name}`;
+  document.getElementById('graphTypeName').textContent = info.name;
+  document.getElementById('graphType').textContent = info.name;
+
+  addJournalEntry(`Grafo cambiado a ${info.name}. ${info.impact}`);
+
+  updateMathPanel();
+  updateHUD();
+  renderShields();
+
+  // Visual flash
+  cosmosCanvas.classList.add('graph-shift');
+  setTimeout(()=>cosmosCanvas.classList.remove('graph-shift'),600);
+}
+
+// ══════════════════════════════════════════════════════
+// MATH PANEL
+// ══════════════════════════════════════════════════════
+function updateMathPanel() {
+  const n = GS.nodes.length;
+  const A = getAdj(n, GS.edges);
+  const deg = getDegrees(n, GS.edges);
+  const info = GRAPH_TYPES[GS.graphType] || GRAPH_TYPES.tree;
+  const cycles = countCycles(n, GS.edges);
+  const conn = isConnected(n, GS.edges);
+  const diam = conn ? graphDiameter(n, GS.edges) : Infinity;
+  const eigs = computeEigenvalues(n, GS.edges);
+  const fiedler = algebraicConnectivity(n, GS.edges);
+  const maxDeg = Math.max(...deg);
+  const minDeg = Math.min(...deg);
+  const avgDeg = (deg.reduce((a,b)=>a+b,0)/n).toFixed(2);
+
+  // Graph type name + formal
+  document.getElementById('gTypeName').textContent = info.name;
+  document.getElementById('gTypeFormal').innerHTML = `
+    <div>${info.formal}</div>
+    <div style="margin-top:6px"><span class="formula">G = (V, E)</span> &nbsp;|V|=${n}, |E|=${GS.edges.length}</div>
+  `;
+
+  // Properties
+  const props = [
+    ['|V| vértices', n, 'info'],
+    ['|E| aristas', GS.edges.length, 'info'],
+    ['Conexo', conn?'Sí':'No', conn?'good':'bad'],
+    ['Ciclos independientes', cycles, cycles===0?'good':'info'],
+    ['Grado máx. Δ', maxDeg, 'info'],
+    ['Grado mín. δ', minDeg, 'info'],
+    ['Grado promedio', avgDeg, 'info'],
+    ['Diámetro', conn?(diam===Infinity?'∞':diam):'∞', 'info'],
+    ['Fiedler λ₂', fiedler.toFixed(2), fiedler>0?'good':'bad'],
+    ['|E|−|V|+1', cycles, 'info'],
+  ];
+  document.getElementById('graphPropsBox').innerHTML = props.map(([k,v,cls])=>`
+    <div class="prop-row"><span class="key">${k}</span><span class="pval ${cls}">${v}</span></div>
+  `).join('');
+
+  // Matrix
+  let matHtml = '  ';
+  GS.nodes.forEach(nd=>matHtml+=nd.label+' ');
+  matHtml+='\n';
+  A.forEach((row,i)=>{
+    matHtml+=GS.nodes[i].label+' ';
+    row.forEach(v=>{
+      if(v===0) matHtml+=`<span class="mz">0</span> `;
+      else matHtml+=`<span class="mv">1</span> `;
+    });
+    matHtml+='\n';
+  });
+  document.getElementById('matrixDisplay').innerHTML = matHtml;
+
+  // Eigenvalues
+  document.getElementById('eigenDisplay').innerHTML = eigs.map((e,i)=>`<span class="eigen-pill">λ${i}=${e}</span>`).join('');
+  document.getElementById('spectrumNote').innerHTML =
+    `λ₀=0 siempre (grafo conexo).<br>λ₁ (Fiedler)=${fiedler.toFixed(2)} mide la <em>conectividad algebraica</em>.<br>` +
+    `λₘₐₓ ≤ n−1 (Kₙ). Suma de autovalores = 2|E|=${2*GS.edges.length}.`;
+
+  // Relevant theorems from graph type
+  document.getElementById('relevantTheorems').innerHTML = info.theorems.map(t=>`
+    <div class="theorem-info-block">
+      <div class="th-name">${t.name}</div>
+      <div class="th-stmt">${t.stmt}</div>
+      <div class="th-form">${t.formula}</div>
+    </div>
+  `).join('<hr style="border:none;border-top:1px solid rgba(0,245,255,0.05);margin:4px 0">');
+}
+
+// ══════════════════════════════════════════════════════
+// NODE SELECTION
+// ══════════════════════════════════════════════════════
+function selectNode(idx) {
+  GS.selectedNode = idx;
+  GS.visitedNodes.add(idx);
+  const node = GS.nodes[idx];
+  const n = GS.nodes.length;
+  const deg = getDegrees(n, GS.edges);
+  const neighbors = GS.edges.filter(([a,b])=>a===idx||b===idx).map(([a,b])=>a===idx?b:a);
+  const d = deg[idx];
+  const dist = bfsDistances(n, GS.edges, idx);
+
+  document.getElementById('nodeInfo').innerHTML = `
+    <div class="prop-row"><span class="key">nodo</span><span class="pval info">${node.label}</span></div>
+    <div class="prop-row"><span class="key">rol</span><span class="pval ${node.type==='enemy'?'bad':node.type==='treasure'?'good':'info'}">${node.type}</span></div>
+    <div class="prop-row"><span class="key">grado δ(${node.label})</span><span class="pval">${d} (${d%2===0?'par':'impar'})</span></div>
+    <div class="prop-row"><span class="key">|N(${node.label})|</span><span class="pval">${neighbors.length}</span></div>
+  `;
+
+  document.getElementById('neighborInfo').innerHTML = `
+    N(${node.label}) = { ${neighbors.map(j=>GS.nodes[j]?.label||'?').join(', ')} }<br>
+    Fila A[${node.label}]: [${GS.nodes.map((_,i)=>GS.edges.some(([a,b])=>(a===idx&&b===i)||(b===idx&&a===i))?'1':'0').join(' ')}]
+  `;
+
+  const distHtml = GS.nodes.map((nd,i)=>{
+    const dv = dist[i];
+    return `d(${node.label},${nd.label}) = ${dv===Infinity?'∞':dv}`;
+  }).join('<br>');
+  document.getElementById('pathInfo').innerHTML = distHtml;
+
+  switchTab('node');
+
+  if (!GS.clearedNodes.has(idx) && node.type !== 'start') {
+    setTimeout(()=>openChallenge(idx), 180);
+  } else if (node.type === 'start' && !GS.clearedNodes.has(idx)) {
+    GS.clearedNodes.add(idx);
+    GS.shields = Math.min(GS.maxShields+1, GS.shields+0); // No shield on start
+    log(`★ Nodo base ${node.label}. Explora el grafo cósmico.`);
+    checkAdvance();
+  }
+  updateHUD();
+}
+
+// ══════════════════════════════════════════════════════
+// CHALLENGES (expanded)
+// ══════════════════════════════════════════════════════
+const challengeBank = [
+  { // Degree question
+    gen(g, idx) {
+      const n=g.nodes.length; const deg=getDegrees(n,g.edges);
+      const d=deg[idx];
+      const opts=[...new Set([d,d+1,Math.max(0,d-1),d+2])].slice(0,3).map(String);
+      return { q:`¿Cuál es el grado del nodo ${g.nodes[idx].label}?\n(El grado es el número de aristas incidentes en el vértice)`, opts, ans:String(d) };
+    }
+  },
+  { // Connectivity
+    gen(g) {
+      const conn=isConnected(g.nodes.length,g.edges);
+      return { q:`¿El grafo G=(V,E) con |V|=${g.nodes.length} y |E|=${g.edges.length} es conexo?\n(Un grafo es conexo si existe camino entre todo par de vértices)`, opts:['Sí, es conexo','No, es disconexo'], ans:conn?'Sí, es conexo':'No, es disconexo' };
+    }
+  },
+  { // Cycle rank
+    gen(g) {
+      const c=countCycles(g.nodes.length,g.edges);
+      return { q:`¿Cuál es el rango de ciclos (dimensión del espacio de ciclos)?\nFórmula: γ(G) = |E| − |V| + c, con c=componentes conexas.`, opts:[...new Set([c,c+1,Math.max(0,c-1)])].slice(0,3).map(String), ans:String(c) };
+    }
+  },
+  { // Adjacency row
+    gen(g, idx) {
+      const n=g.nodes.length; const A=getAdj(n,g.edges);
+      const row=A[idx];
+      const correct=row.join(' ');
+      const wrong1=row.map(v=>v===0?1:0).join(' ');
+      const wrong2=[...row].reverse().join(' ');
+      return { q:`Selecciona la fila ${g.nodes[idx].label} de la Matriz de Adyacencia A:\n(A[i][j]=1 si existe arista {i,j}, 0 en caso contrario)`, opts:[correct,wrong1,wrong2], ans:correct };
+    }
+  },
+  { // Euler path condition
+    gen(g) {
+      const n=g.nodes.length; const deg=getDegrees(n,g.edges);
+      const odd=deg.filter(d=>d%2!==0).length;
+      const has = odd===0||odd===2;
+      return { q:`¿Existe un camino euleriano en este grafo?\n(Teorema de Euler: existe ⟺ el grafo tiene exactamente 0 o 2 vértices de grado impar.\nActualmente hay ${odd} vértices de grado impar.)`, opts:['Sí, existe camino euleriano','No existe camino euleriano'], ans:has?'Sí, existe camino euleriano':'No existe camino euleriano' };
+    }
+  },
+  { // Handshaking lemma
+    gen(g) {
+      const n=g.nodes.length; const deg=getDegrees(n,g.edges);
+      const sumDeg=deg.reduce((a,b)=>a+b,0);
+      const opts=[...new Set([sumDeg, sumDeg+1, sumDeg-1, sumDeg+2])].slice(0,3).map(String);
+      return { q:`Por el Lema del apretón de manos: Σ deg(v) = 2|E|.\n¿Cuál es la suma de todos los grados del grafo actual? (|E|=${g.edges.length})`, opts, ans:String(sumDeg) };
+    }
+  },
+  { // Bipartite check
+    gen(g) {
+      const n=g.nodes.length; const A=getAdj(n,g.edges);
+      // BFS 2-color
+      const color=new Array(n).fill(-1); color[0]=0; const q=[0]; let bip=true;
+      while(q.length&&bip){ const v=q.shift(); for(let u=0;u<n;u++){ if(A[v][u]){ if(color[u]===-1){color[u]=1-color[v];q.push(u);} else if(color[u]===color[v]){bip=false;break;} } } }
+      return { q:`¿El grafo es bipartito?\n(Un grafo es bipartito ⟺ no contiene ciclos impares.\nUn grafo es bipartito ⟺ es 2-coloreable.)`, opts:['Sí, es bipartito','No, no es bipartito'], ans:bip?'Sí, es bipartito':'No, no es bipartito' };
+    }
+  },
+  { // Diameter
+    gen(g) {
+      const n=g.nodes.length; const conn=isConnected(n,g.edges);
+      const diam=conn?graphDiameter(n,g.edges):Infinity;
+      const opts=conn?[...new Set([diam,diam+1,Math.max(1,diam-1)])].slice(0,3).map(String):['∞ (grafo disconexo)','1','2'];
+      return { q:`¿Cuál es el diámetro del grafo?\n(Diámetro = max{d(u,v) : u,v ∈ V}, donde d es la distancia más corta)`, opts, ans:conn?String(diam):'∞ (grafo disconexo)' };
+    }
+  },
+];
+
+function openChallenge(nodeIdx) {
+  const node = GS.nodes[nodeIdx];
+  const ch = challengeBank[Math.floor(Math.random()*challengeBank.length)];
+  const data = ch.gen(GS, nodeIdx);
+  GS.challengePending = { nodeIdx, ans: data.ans };
+
+  const icons = { enemy:'⚠', treasure:'◈', start:'★', normal:'◉' };
+  document.getElementById('challengeIcon').textContent = icons[node.type]||'⚡';
+  document.getElementById('challengeNodeInfo').innerHTML = `
+    <span class="hl">Nodo ${node.label}</span> · tipo: ${node.type} · 
+    grado: ${getDegrees(GS.nodes.length,GS.edges)[nodeIdx]} · 
+    vecinos: {${GS.edges.filter(([a,b])=>a===nodeIdx||b===nodeIdx).map(([a,b])=>GS.nodes[a===nodeIdx?b:a]?.label).join(',')}}
+  `;
+  document.getElementById('challengeQ').textContent = data.q;
+
+  const optsDiv = document.getElementById('challengeOpts');
+  optsDiv.innerHTML='';
+  data.opts.sort(()=>Math.random()-0.5).forEach(opt=>{
+    const btn = document.createElement('button');
+    btn.className='challenge-btn';
+    btn.textContent=opt;
+    btn.onclick=()=>answerChallenge(opt,btn);
+    optsDiv.appendChild(btn);
+  });
+  document.getElementById('challengeOverlay').classList.add('open');
+}
+
+function answerChallenge(choice, btn) {
+  const {nodeIdx, ans} = GS.challengePending;
+  document.querySelectorAll('.challenge-btn').forEach(b=>b.onclick=null);
+  const node = GS.nodes[nodeIdx];
+
+  if (choice===ans) {
+    btn.classList.add('correct');
+    GS.energia = Math.min(10, GS.energia+1);
+    GS.score += 100 * GS.nivel;
+    GS.clearedNodes.add(nodeIdx);
+    if (node.type==='treasure') {
+      unlockRandomTeorema();
+      GS.shields = Math.min(GS.maxShields, GS.shields+1);
+      log(`◈ ¡Tesoro descubierto! Teorema desbloqueado + escudo restaurado.`, 'good');
+    } else if (node.type==='enemy') {
+      log(`✓ Nodo ${node.label} neutralizado. +${100*GS.nivel} pts.`, 'good');
+    } else {
+      log(`✓ Nodo ${node.label} explorado. +1 energía lógica.`, 'good');
+    }
+    addJournalEntry(`Nodo ${node.label} (${node.type}) explorado correctamente.`);
+    setTimeout(()=>{
+      document.getElementById('challengeOverlay').classList.remove('open');
+      checkAdvance(); updateHUD(); updateMathPanel(); renderShields();
+    }, 700);
+  } else {
+    btn.classList.add('wrong');
+    GS.energia = Math.max(0, GS.energia-1);
+    log(`✗ Incorrecto. Respuesta: ${ans}. −1 energía.`, 'warn');
+    addJournalEntry(`Nodo ${node.label}: error. Respuesta correcta: ${ans}`);
+    setTimeout(()=>{ document.getElementById('challengeOverlay').classList.remove('open'); updateHUD(); }, 1000);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// TEOREMAS
+// ══════════════════════════════════════════════════════
+const teoremasData = {
+  euler: {
+    name: 'PUENTE DE EULER',
+    desc: 'Crea arista desde vértice impar. (Camino euleriano requiere 0 o 2 vértices impares — Euler, 1736)',
+    cost: 1,
+    apply(gs) {
+      const n=gs.nodes.length; const deg=getDegrees(n,gs.edges);
+      const impar=deg.findIndex(d=>d%2!==0);
+      if(impar===-1){log('No hay vértices de grado impar.','warn');return false;}
+      const dest=gs.nodes.findIndex((_,i)=>i!==impar&&!gs.edges.some(([a,b])=>(a===impar&&b===i)||(b===impar&&a===i)));
+      if(dest===-1){log('No hay destino disponible.','warn');return false;}
+      gs.edges.push([impar,dest]);
+      log(`⚡ Puente de Euler: arista ${gs.nodes[impar].label}→${gs.nodes[dest].label} creada.`,'good');
+      return true;
+    }
+  },
+  amistad: {
+    name: 'TEOREMA DE AMISTAD',
+    desc: 'Si tres nodos forman K₃, colapsa el triángulo. (Erdős–Rényi–Sós, 1966)',
+    cost: 2,
+    apply(gs) {
+      const n=gs.nodes.length; const A=getAdj(n,gs.edges);
+      for(let i=0;i<n;i++) for(let j=i+1;j<n;j++) for(let k=j+1;k<n;k++){
+        if(A[i][j]&&A[j][k]&&A[i][k]){
+          gs.edges=gs.edges.filter(([a,b])=>!(a===j||b===j||a===k||b===k));
+          gs.nodes.forEach((_,m)=>{ if(m!==i&&m!==j&&m!==k&&A[m]&&(A[m][j]||A[m][k])){ if(!gs.edges.some(([a,b])=>(a===i&&b===m)||(a===m&&b===i))) gs.edges.push([i,m]); } });
+          gs.nodes[j]=null; gs.nodes[k]=null;
+          gs.nodes=gs.nodes.filter(Boolean).map((nd,idx)=>({...nd,id:idx}));
+          gs.edges=gs.edges.map(([a,b])=>{let na=a,nb=b;if(a>=j)na--;if(b>=j)nb--;if(na>=k-1)na--;if(nb>=k-1)nb--;return[na,nb];}).filter(([a,b])=>a>=0&&b>=0&&a!==b);
+          log(`★ Triángulo {K₃} colapsado por Teorema de Amistad.`,'good');
+          return true;
+        }
+      }
+      log('No hay triángulo K₃ en el grafo.','warn'); return false;
+    }
+  },
+  conexion: {
+    name: 'CONEXIÓN DIRECTA',
+    desc: 'Une dos nodos a distancia 2 (vecinos de vecinos). Reduce el diámetro del grafo.',
+    cost: 1,
+    apply(gs) {
+      const n=gs.nodes.length; const A=getAdj(n,gs.edges);
+      for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
+        if(!A[i][j]){ const shared=gs.nodes.some((_,k)=>k!==i&&k!==j&&A[i][k]&&A[k][j]); if(shared){ gs.edges.push([i,j]); log(`◉ Conexión Directa: ${gs.nodes[i].label}–${gs.nodes[j].label} (d=2).`,'good'); return true; } }
+      }
+      log('No hay par de nodos a distancia 2.','warn'); return false;
+    }
+  },
+  bosque: {
+    name: 'BOSQUE DE ÁRBOLES',
+    desc: 'Elimina una arista de ciclo, convirtiendo el grafo en árbol/bosque. (Rango de ciclos decrece en 1)',
+    cost: 1,
+    apply(gs) {
+      const n=gs.nodes.length;
+      for(let eIdx=0;eIdx<gs.edges.length;eIdx++){
+        const testEdges=gs.edges.filter((_,i)=>i!==eIdx);
+        if(countCycles(n,testEdges)<countCycles(n,gs.edges)){ const[a,b]=gs.edges[eIdx]; gs.edges=testEdges; log(`🌲 Bosque: arista ${gs.nodes[a].label}–${gs.nodes[b].label} eliminada. γ reducido.`,'good'); return true; }
+      }
+      log('El grafo ya es un bosque (sin ciclos).','warn'); return false;
+    }
+  },
+  complemento: {
+    name: 'GRAFO COMPLEMENTO',
+    desc: 'Invierte el grafo: Ḡ tiene aristas donde G no las tiene. χ(G)+χ(Ḡ) ≥ 2√n (Nordhaus–Gaddum)',
+    cost: 2,
+    apply(gs) {
+      const n=gs.nodes.length;
+      if(n>5){log('Complemento: solo para |V|≤5.','warn');return false;}
+      const newEdges=[];
+      for(let i=0;i<n;i++) for(let j=i+1;j<n;j++) if(!gs.edges.some(([a,b])=>(a===i&&b===j)||(a===j&&b===i))) newEdges.push([i,j]);
+      gs.edges=newEdges; log('⇄ Grafo Complemento: aristas invertidas. Propiedades modificadas.','good'); return true;
+    }
+  },
+  menger: {
+    name: 'TEOREMA DE MENGER',
+    desc: 'El número de caminos vértice-disjuntos entre u,v = conectividad de vértices κ(G). Añade un nodo.',
+    cost: 2,
+    apply(gs) {
+      const n=gs.nodes.length;
+      if(n>=8){log('Grafo demasiado grande para expansión.','warn');return false;}
+      const newId=n;
+      gs.nodes.push({id:newId,label:String.fromCharCode(65+newId%26),type:'normal'});
+      const connectTo=Math.min(2,n);
+      for(let i=0;i<connectTo;i++) gs.edges.push([i,newId]);
+      log(`✦ Menger: nodo ${gs.nodes[newId].label} añadido. Conectividad actualizada.`,'good');
+      return true;
+    }
+  },
+  kuratowski: {
+    name: 'KURATOWSKI',
+    desc: 'G es plano ⟺ no contiene subdivisión de K₅ ni K₃,₃. Verifica planaridad y elimina cruce.',
+    cost: 3,
+    apply(gs) {
+      const n=gs.nodes.length; const m=gs.edges.length;
+      if(m<=3*n-6){log('El grafo ya cumple la cota de planaridad (|E|≤3|V|−6).','warn');return false;}
+      gs.edges.pop();
+      log(`🔷 Kuratowski: arista eliminada. |E|=${gs.edges.length} ≤ ${3*n-6}=3|V|−6.`,'good');
+      return true;
+    }
+  },
+  ramsey: {
+    name: 'RAMSEY R(3,3)=6',
+    desc: 'En K₆, siempre hay un triángulo monocromático. Si hay ≥6 nodos, fuerza una clique K₃.',
+    cost: 3,
+    apply(gs) {
+      const n=gs.nodes.length;
+      if(n<6){log('Ramsey requiere al menos 6 vértices.','warn');return false;}
+      const A=getAdj(n,gs.edges);
+      // Find triangle or create one
+      for(let i=0;i<n;i++) for(let j=i+1;j<n;j++) for(let k=j+1;k<n;k++){
+        if(!A[i][j]){ gs.edges.push([i,j]); log(`⬡ Ramsey: arista ${gs.nodes[i].label}–${gs.nodes[j].label} forzada por principio de Ramsey R(3,3).`,'good'); return true; }
+      }
+      log('El grafo ya es completo (Kₙ). Ramsey trivial.','warn'); return false;
+    }
+  }
+};
+
+function unlockRandomTeorema() {
+  const all=Object.keys(teoremasData);
+  const locked=all.filter(id=>!GS.unlockedTeoremas.includes(id));
+  if(locked.length===0){ GS.energia=Math.min(10,GS.energia+2); return; }
+  const pick=locked[Math.floor(Math.random()*locked.length)];
+  GS.unlockedTeoremas.push(pick);
+  renderTeoremas();
+}
+
+function applyTeorema(id) {
+  if(!GS.unlockedTeoremas.includes(id)) return;
+  const t=teoremasData[id];
+  if(GS.energia<t.cost){log('⚠ Energía insuficiente.','warn');return;}
+  const ok=t.apply(GS);
+  if(ok){
+    GS.energia-=t.cost;
+    graphNodePositions=layoutGraphNodes(GS.nodes.length);
+    updateHUD(); updateMathPanel(); checkAdvance(); renderShields();
+  }
+}
+
+function renderTeoremas() {
+  const panel=document.getElementById('teoremasPanel');
+  panel.innerHTML='';
+  Object.keys(teoremasData).forEach(id=>{
+    const t=teoremasData[id];
+    const locked=!GS.unlockedTeoremas.includes(id);
+    const card=document.createElement('div');
+    card.className='teorema-card'+(locked?' locked':'');
+    card.innerHTML=`<div class="teorema-name">${t.name}</div><div class="teorema-desc">${t.desc}</div><div class="teorema-cost">−${t.cost}⚡</div>`;
+    if(!locked) card.onclick=()=>{ card.classList.add('active-glow'); setTimeout(()=>card.classList.remove('active-glow'),400); applyTeorema(id); };
+    panel.appendChild(card);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// GRAPH TYPE SELECTOR (in cosmos area)
+// ══════════════════════════════════════════════════════
+function buildGraphTypeSelector() {
+  const existing = document.getElementById('graphTypeSelector');
+  if (existing) existing.remove();
+
+  const sel = document.createElement('div');
+  sel.id = 'graphTypeSelector';
+  sel.style.cssText = `
+    position:absolute; bottom:12px; right:12px; z-index:5;
+    display:flex; flex-direction:column; gap:4px; align-items:flex-end;
+  `;
+
+  const label = document.createElement('div');
+  label.style.cssText = 'font-family:Orbitron,monospace;font-size:8px;letter-spacing:2px;color:rgba(0,245,255,0.5);margin-bottom:2px;text-align:right;';
+  label.textContent = 'CAMBIAR TIPO GRAFO';
+  sel.appendChild(label);
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:220px;';
+
+  Object.entries(GRAPH_TYPES).forEach(([key, info]) => {
+    const btn = document.createElement('button');
+    btn.style.cssText = `
+      background:rgba(6,13,26,0.9); border:1px solid rgba(0,245,255,0.15);
+      color:${info.color}; font-family:JetBrains Mono,monospace; font-size:9px;
+      padding:4px 8px; border-radius:3px; cursor:pointer; white-space:nowrap;
+      transition:all 0.15s; letter-spacing:0.5px;
+    `;
+    btn.textContent = info.symbol;
+    btn.title = info.name;
+    btn.onclick = () => changeGraphType(key);
+    btn.onmouseenter = () => { btn.style.background='rgba(0,245,255,0.08)'; btn.style.borderColor=info.color; };
+    btn.onmouseleave = () => { btn.style.background='rgba(6,13,26,0.9)'; btn.style.borderColor='rgba(0,245,255,0.15)'; };
+    row.appendChild(btn);
+  });
+  sel.appendChild(row);
+  document.getElementById('cosmosArea').appendChild(sel);
+}
+
+// ══════════════════════════════════════════════════════
+// HUD, LOG, SHIELDS
+// ══════════════════════════════════════════════════════
+function updateHUD() {
+  document.getElementById('nivelNum').textContent = GS.nivel;
+  document.getElementById('energiaNum').textContent = GS.energia;
+  document.getElementById('scoreNum').textContent = GS.score;
+  document.getElementById('graphTypeName').textContent = (GRAPH_TYPES[GS.graphType]||GRAPH_TYPES.tree).symbol;
+}
+
+function renderShields() {
+  const bar = document.getElementById('shieldsBar');
+  bar.innerHTML='';
+  for(let i=0;i<GS.maxShields;i++){
+    const pip=document.createElement('div');
+    pip.className='shield-pip'+(i<GS.shields?' active':' damaged');
+    bar.appendChild(pip);
+  }
+}
+
+function log(msg, type='') {
+  const el=document.getElementById('logText');
+  el.textContent=msg; el.className='log-entry'+(type?' '+type:'');
+}
+
+function showOverlay(big, sub) {
+  document.getElementById('overlayBig').textContent=big;
+  document.getElementById('overlaySub').textContent=sub;
+  const o=document.getElementById('overlayMsg');
+  o.classList.add('visible');
+  setTimeout(()=>o.classList.remove('visible'),3000);
+}
+
+function addJournalEntry(txt) {
+  GS.journalEntries.unshift(`[Sector ${GS.nivel}] ${txt}`);
+  if(GS.journalEntries.length>20) GS.journalEntries.pop();
+  document.getElementById('journalLog').innerHTML=GS.journalEntries.slice(0,10).map(e=>`<div style="border-bottom:1px solid rgba(0,245,255,0.05);padding:4px 0">${e}</div>`).join('');
+
+  if(!GS.discoveredGraphs.includes(GS.graphType)){
+    GS.discoveredGraphs.push(GS.graphType);
+    const info=GRAPH_TYPES[GS.graphType];
+    document.getElementById('discoveredGraphs').innerHTML=GS.discoveredGraphs.map(k=>`
+      <div style="padding:4px 0;border-bottom:1px solid rgba(0,245,255,0.05);">
+        <span style="color:${GRAPH_TYPES[k].color}">${GRAPH_TYPES[k].symbol}</span> ${GRAPH_TYPES[k].name}
+      </div>
+    `).join('');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// LEVEL ADVANCE
+// ══════════════════════════════════════════════════════
+function checkAdvance() {
+  const enemies=GS.nodes.filter(n=>n.type==='enemy');
+  if(enemies.every(n=>GS.clearedNodes.has(n.id))&&!GS.canAdvance){
+    GS.canAdvance=true;
+    document.getElementById('nextLevelBtn').style.display='block';
+    log('🎯 ¡Sector completado! Puedes avanzar.','good');
+    showOverlay('SECTOR COMPLETADO','Todos los nodos objetivo despejados');
+    switchTab('theorems');
+  }
+}
+
+function nextLevel() {
+  GS.nivel++;
+  GS.energia=Math.min(10,GS.energia+2);
+  GS.score+=500*GS.nivel;
+
+  const g=buildLevel(GS.nivel);
+  GS.nodes=g.nodes; GS.edges=g.edges;
+  GS.graphType=g.type; GS.graphLabel=(GRAPH_TYPES[g.type]||GRAPH_TYPES.tree).name;
+  GS.selectedNode=null; GS.visitedNodes=new Set(); GS.clearedNodes=new Set();
+  GS.canAdvance=false; GS.challengePending=null;
+  GS.meteorTimer=0; GS.meteors=[];
+
+  // Restore 1 shield on level advance
+  GS.shields=Math.min(GS.maxShields,GS.shields+1);
+
+  document.getElementById('nextLevelBtn').style.display='none';
+  graphNodePositions=layoutGraphNodes(GS.nodes.length);
+
+  const info=GRAPH_TYPES[g.type]||GRAPH_TYPES.tree;
+  document.getElementById('graphBadge').textContent=`CÚMULO ${g.clusterName} — ${info.name}`;
+
+  updateHUD(); updateMathPanel(); renderTeoremas(); renderShields();
+  document.getElementById('nodeInfo').innerHTML='<div style="color:var(--dim)">— selecciona un nodo —</div>';
+  document.getElementById('neighborInfo').innerHTML='';
+  document.getElementById('pathInfo').innerHTML='';
+  addJournalEntry(`Nuevo sector: ${info.name}. Dificultad: ${g.difficulty}/5.`);
+  log(`▸ Sector ${GS.nivel} iniciado: ${info.name}. ${info.impact}`);
+  showOverlay(`SECTOR ${GS.nivel}`, info.name);
+}
+
+// ══════════════════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel-tab').forEach(t=>t.classList.remove('active'));
+  const el=document.getElementById('tab-'+name);
+  if(el) el.classList.add('active');
+  document.querySelectorAll('.panel-tab').forEach(t=>{ if(t.textContent.toLowerCase().includes(name.slice(0,4).toLowerCase())) t.classList.add('active'); });
+}
+
+// ══════════════════════════════════════════════════════
+// CANVAS INTERACTION
+// ══════════════════════════════════════════════════════
+cosmosCanvas.addEventListener('click', e => {
+  const rect=cosmosCanvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  let hit=-1;
+  graphNodePositions.forEach(([x,y],i)=>{ if(Math.hypot(mx-x,my-y)<22) hit=i; });
+  if(hit>=0) selectNode(hit);
+});
+
+cosmosCanvas.addEventListener('mousemove', e => {
+  const rect=cosmosCanvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const tt=document.getElementById('tooltip');
+  let hit=-1;
+  graphNodePositions.forEach(([x,y],i)=>{ if(Math.hypot(mx-x,my-y)<22) hit=i; });
+  if(hit>=0){
+    const nd=GS.nodes[hit];
+    const deg=getDegrees(GS.nodes.length,GS.edges)[hit];
+    tt.style.display='block'; tt.style.left=(mx+16)+'px'; tt.style.top=(my-10)+'px';
+    tt.textContent=`${nd.label} | ${nd.type} | δ=${deg}`;
+  } else tt.style.display='none';
+});
+
+// ══════════════════════════════════════════════════════
+// KEYBOARD
+// ══════════════════════════════════════════════════════
+window.addEventListener('keydown', e => { keys[e.key]=true; });
+window.addEventListener('keyup', e => { keys[e.key]=false; });
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+function init() {
+  initBG();
+  initShip();
+
+  const g=buildLevel(1);
+  GS.nodes=g.nodes; GS.edges=g.edges;
+  GS.graphType=g.type; GS.graphLabel=(GRAPH_TYPES[g.type]||GRAPH_TYPES.tree).name;
+
+  graphNodePositions=layoutGraphNodes(GS.nodes.length);
+
+  const info=GRAPH_TYPES[g.type]||GRAPH_TYPES.tree;
+  document.getElementById('graphBadge').textContent=`CÚMULO α — ${info.name}`;
+
+  renderTeoremas();
+  renderShields();
+  updateHUD();
+  updateMathPanel();
+  buildGraphTypeSelector();
+  addJournalEntry('Viaje iniciado. Sector α: ' + info.name);
+  log('▸ Sector 1 iniciado. Usa ↑←↓→ o WASD para maniobrar la nave. Clic en nodos para explorar.');
+  switchTab('math');
+
+  gameLoop();
+}
+
+init();
+</script>
+</body>
+</html>
