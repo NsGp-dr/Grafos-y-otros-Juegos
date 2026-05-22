@@ -1,347 +1,1089 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, touch-action: manipulation">
-  <title>NetHack: Pathfinder | V0.1.0</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #0a0c0f;
-      display: flex; flex-direction: column; align-items: center;
-      font-family: 'Share Tech Mono', monospace;
-      height: 100vh; overflow: hidden;
-      user-select: none; touch-action: none;
-    }
-    #game-canvas {
-      display: block; width: 100%; height: auto;
-      box-shadow: 0 0 30px rgba(0, 255, 65, 0.2);
-      touch-action: none;
-    }
-    
-    /* HUD de Hacker */
-    #hud {
-      position: fixed; top: 10px; left: 10px; right: 10px;
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 8px 16px; z-index: 20;
-      background: rgba(10, 12, 15, 0.8);
-      backdrop-filter: blur(10px);
-      border: 1px solid #00ff4133;
-      border-radius: 8px;
-      color: #00ff41; font-size: 0.9rem;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.8);
-    }
-    .hud-item { display: flex; align-items: center; gap: 8px; }
-    .hud-label { color: #008f11; text-transform: uppercase; }
-    
-    /* Visor de Matriz (parte del HUD) */
-    #matrix-hud {
-      position: fixed; top: 70px; right: 10px; width: 150px;
-      background: rgba(10, 15, 10, 0.85);
-      backdrop-filter: blur(12px);
-      border: 1px solid #00ff41; border-radius: 8px;
-      padding: 8px; color: #00ff41; font-size: 0.7rem;
-      display: none; z-index: 20;
-    }
-    
-    /* Terminal de Log (tarjeta tutorial) */
-    #sys-log {
-      position: fixed; bottom: 90px; left: 15px; right: 15px;
-      background: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(15px);
-      border: 1px solid #00ff41; border-radius: 8px;
-      padding: 12px; color: #b5ffb5; font-size: 0.8rem;
-      z-index: 30; display: none;
-    }
-    #sys-log .prompt { color: #00ff41; }
-    
-    /* Barra de Herramientas */
-    #toolbar {
-      position: fixed; bottom: 15px; left: 15px; right: 15px;
-      background: rgba(10, 12, 15, 0.9);
-      backdrop-filter: blur(12px);
-      border: 1px solid #00ff4133; border-radius: 30px;
-      padding: 10px 15px; display: flex; justify-content: space-around;
-      z-index: 25;
-    }
-    .cyber-btn {
-      background: transparent; border: 1px solid #00ff41; color: #00ff41;
-      font-family: 'Share Tech Mono', monospace; font-size: 0.8rem;
-      padding: 8px 16px; border-radius: 20px; cursor: pointer;
-      transition: 0.2s; text-transform: uppercase;
-    }
-    .cyber-btn.active { background: #00ff41; color: #0a0c0f; box-shadow: 0 0 15px #00ff41; }
-    
-    /* Efectos Glitch */
-    @keyframes glitch {
-      0% { transform: translate(0); }
-      20% { transform: translate(-1px, 1px); }
-      40% { transform: translate(-1px, -1px); }
-      60% { transform: translate(1px, 1px); }
-      80% { transform: translate(1px, -1px); }
-      100% { transform: translate(0); }
-    }
-    .glitch { animation: glitch 0.3s infinite; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<title>NetHack: Graph Lab | V2.5 — Mathematical Beauty</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Orbitron:wght@400;700;900&display=swap');
+
+:root {
+  --bg-deep: #05070a;
+  --bg-panel: rgba(8,12,20,0.95);
+  --green: #00e676;
+  --green-dim: #00695c;
+  --cyan: #00e5ff;
+  --amber: #ffb300;
+  --violet: #b388ff;
+  --rose: #ff5252;
+  --text: #b0bec5;
+  --border: rgba(0,230,118,0.2);
+  --border-glow: rgba(0,230,118,0.4);
+  --mono: 'JetBrains Mono', 'Share Tech Mono', monospace;
+  --title-font: 'Orbitron', sans-serif;
+  --radius: 10px;
+  --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg-deep);font-family:var(--mono);color:var(--text);touch-action:none;user-select:none}
+
+/* ══ LAYOUT ══ */
+#root{display:grid;grid-template-rows:48px 1fr 56px;height:100%;overflow:hidden}
+
+/* ══ TOPBAR ══ */
+#topbar{display:flex;align-items:center;gap:8px;padding:0 16px;background:var(--bg-panel);border-bottom:1px solid var(--border);z-index:30;flex-shrink:0;backdrop-filter:blur(16px)}
+#topbar .logo{font-family:var(--title-font);font-size:13px;font-weight:700;color:var(--green);letter-spacing:3px;white-space:nowrap}
+.sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
+.stat{display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap}
+.stat .lbl{color:var(--green-dim);text-transform:uppercase;letter-spacing:1px}
+.stat .val{color:var(--green);font-weight:600}
+.stat .val.gold{color:var(--amber)}
+.stat .val.cyan{color:var(--cyan)}
+.stat .val.rose{color:var(--rose)}
+#topbar .sp{flex:1}
+#btnHelp2{background:transparent;border:1px solid var(--border);color:var(--green-dim);font-family:var(--mono);font-size:9px;padding:4px 10px;border-radius:4px;cursor:pointer;letter-spacing:1px;transition:var(--transition)}
+#btnHelp2:hover{border-color:var(--green);color:var(--green)}
+
+/* ══ MAIN AREA ══ */
+#main{position:relative;overflow:hidden}
+#cv{display:block;width:100%;height:100%;cursor:crosshair}
+
+/* ══ FLOATING PANELS ══ */
+.fpanel{position:absolute;background:var(--bg-panel);border:1px solid var(--border);border-radius:var(--radius);font-size:10px;line-height:1.7;z-index:20;backdrop-filter:blur(16px);overflow:hidden;transition:opacity var(--transition), transform var(--transition);transform:translateY(0);opacity:1}
+.fpanel.hidden{opacity:0;pointer-events:none;transform:translateY(-10px)}
+
+#matPanel{top:10px;right:10px;width:200px;display:none}
+#matPanel .ph{background:rgba(0,230,118,0.06);padding:8px 12px;font-size:10px;letter-spacing:2px;color:var(--green-dim);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+#matPanel .ph button{background:none;border:none;color:var(--rose);cursor:pointer;font-size:14px;line-height:1;transition:var(--transition)}
+#matPanel .ph button:hover{color:var(--green)}
+#matPanel .pb{padding:8px 12px;overflow-x:auto}
+#matContent{font-size:10px;white-space:pre;color:var(--green)}
+
+#anaPanel{top:10px;left:10px;width:200px;display:none}
+#anaPanel .ph{background:rgba(0,230,118,0.06);padding:8px 12px;font-size:10px;letter-spacing:2px;color:var(--green-dim);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+#anaPanel .ph button{background:none;border:none;color:var(--rose);cursor:pointer;font-size:14px;line-height:1;transition:var(--transition)}
+#anaPanel .ph button:hover{color:var(--green)}
+#anaPanel .pb{padding:8px 12px}
+.ana-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(0,230,118,0.07)}
+.ana-row .ak{color:var(--green-dim);font-size:9px;text-transform:uppercase;letter-spacing:0.5px}
+.ana-row .av{font-size:9px}
+.av.ok{color:var(--green)}
+.av.warn{color:var(--amber)}
+.av.bad{color:var(--rose)}
+.av.info{color:var(--cyan)}
+
+#matToggle{cursor:pointer;letter-spacing:1px;color:var(--cyan);transition:var(--transition);padding:4px 0;display:inline-block}
+#matToggle:hover{color:var(--amber)}
+
+#nodeTooltip{position:absolute;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:9px;pointer-events:none;display:none;min-width:120px;z-index:50;backdrop-filter:blur(12px)}
+
+/* ══ SYSLOG ══ */
+#syslog{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(8,12,20,0.92);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-size:10px;color:var(--green);pointer-events:none;white-space:nowrap;z-index:40;opacity:0;transition:opacity 0.3s;max-width:90%}
+#syslog.show{opacity:1}
+
+/* ══ FRACTAL ══ */
+#fractalOverlay{position:absolute;inset:0;background:var(--bg-deep);z-index:60;display:none;flex-direction:column}
+#fractalOverlay.show{display:flex}
+#fractalTop{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--bg-panel);border-bottom:1px solid var(--border);flex-shrink:0}
+#fractalTop .ft{font-family:var(--title-font);font-size:12px;color:var(--cyan);letter-spacing:3px}
+#fractalTop .sp{flex:1}
+#btnCloseFractal{background:none;border:1px solid var(--border);color:var(--rose);font-family:var(--mono);font-size:10px;padding:5px 12px;border-radius:4px;cursor:pointer;transition:var(--transition)}
+#btnCloseFractal:hover{border-color:var(--rose);color:var(--rose)}
+#fractalCanvas{flex:1;display:block;width:100%}
+#fractalControls{display:flex;gap:6px;padding:8px 12px;background:var(--bg-panel);border-top:1px solid var(--border);overflow-x:auto;flex-shrink:0}
+.fc-btn{background:transparent;border:1px solid var(--border);color:var(--green-dim);font-family:var(--mono);font-size:9px;padding:6px 12px;border-radius:4px;cursor:pointer;white-space:nowrap;letter-spacing:1px;flex-shrink:0;transition:var(--transition)}
+.fc-btn.on{background:rgba(0,230,118,0.12);border-color:var(--green);color:var(--green)}
+.fc-btn:hover:not(.on){border-color:var(--green)}
+#fractalInfo{padding:8px 16px;background:var(--bg-panel);border-top:1px solid var(--border);font-size:9px;color:var(--green-dim);line-height:1.8;flex-shrink:0;min-height:40px}
+
+/* ══ BUILD MODE drag ══ */
+.drag-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:var(--green-dim);font-size:11px;pointer-events:none;line-height:2}
+
+/* ══ TOOLBAR ══ */
+#toolbar{background:var(--bg-panel);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-around;padding:0 8px;flex-shrink:0}
+.tb-btn{background:none;border:1px solid transparent;color:var(--green-dim);font-family:var(--mono);font-size:9px;padding:4px 12px;border-radius:20px;cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;transition:var(--transition);display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
+.tb-btn .tbicon{font-size:15px}
+.tb-btn.on{color:var(--green);background:rgba(0,230,118,0.1);border-color:var(--green);box-shadow:0 0 10px rgba(0,230,118,0.2)}
+.tb-btn:active{transform:scale(0.96)}
+
+/* ══ HELP MODAL ══ */
+#helpModal{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.9);align-items:flex-end;justify-content:center;padding:0}
+#helpModal.show{display:flex}
+#hBox{background:var(--bg-panel);border:1px solid var(--border);border-radius:12px 12px 0 0;width:100%;max-height:85vh;overflow-y:auto}
+#hBox h2{padding:16px 20px 12px;font-family:var(--title-font);font-size:14px;color:var(--green);border-bottom:1px solid var(--border);letter-spacing:2px}
+.hs{padding:12px 16px;border-bottom:1px solid var(--border);font-size:10px;line-height:1.8;color:var(--text)}
+.hs h3{font-size:10px;letter-spacing:2px;color:var(--cyan);margin-bottom:6px;text-transform:uppercase}
+.hs strong,.hs b{color:var(--green)}
+.hl{background:rgba(0,230,118,0.06);border-left:2px solid var(--green);padding:6px 10px;border-radius:0 4px 4px 0;margin:4px 0;color:var(--green);font-size:9px}
+#btnCloseHelp{display:block;width:calc(100% - 32px);margin:12px 16px;padding:10px;background:transparent;border:1px solid var(--border);color:var(--green-dim);font-family:var(--mono);font-size:10px;cursor:pointer;border-radius:4px;transition:var(--transition)}
+#btnCloseHelp:hover{border-color:var(--green);color:var(--green)}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
 </head>
 <body>
-  <canvas id="game-canvas"></canvas>
+<div id="root">
 
-  <!-- HUD -->
-  <div id="hud">
-    <div class="hud-item"><span class="hud-label">RANGO:</span><span id="hud-rank">SCRIPT_KIDDIE</span></div>
-    <div class="hud-item"><span class="hud-label">PI:</span><span id="hud-score">0000</span></div>
-    <div class="hud-item"><span class="hud-label">NIVEL:</span><span id="hud-level">01</span></div>
+  <!-- TOPBAR -->
+  <div id="topbar">
+    <div class="logo">GRAPHLAB</div>
+    <div class="sep"></div>
+    <div class="stat"><span class="lbl">RNK</span><span class="val" id="hRank">INIT</span></div>
+    <div class="stat"><span class="lbl">PI</span><span class="val gold" id="hScore">0000</span></div>
+    <div class="stat"><span class="lbl">LVL</span><span class="val cyan" id="hLevel">01</span></div>
+    <div class="stat"><span class="lbl">N</span><span class="val" id="hNodes">0</span></div>
+    <div class="stat"><span class="lbl">E</span><span class="val" id="hEdges">0</span></div>
+    <div class="sp"></div>
+    <button id="btnHelp2" onclick="openHelp()">? AYUDA</button>
   </div>
 
-  <!-- Visor de Matriz -->
-  <div id="matrix-hud"></div>
+  <!-- MAIN AREA -->
+  <div id="main">
+    <canvas id="cv"></canvas>
+    
+    <!-- MATRIZ DE ADYACENCIA -->
+    <div id="matPanel" class="fpanel">
+      <div class="ph">ADYACENCIA<button onclick="document.getElementById('matPanel').style.display='none'">✕</button></div>
+      <div class="pb"><pre id="matContent"></pre></div>
+    </div>
 
-  <!-- Terminal de Log -->
-  <div id="sys-log">
-    <span class="prompt">></span> <span id="log-text"></span>
+    <!-- PANEL DE ANÁLISIS -->
+    <div id="anaPanel" class="fpanel">
+      <div class="ph">ANÁLISIS<button onclick="document.getElementById('anaPanel').style.display='none'">✕</button></div>
+      <div class="pb" id="anaContent"></div>
+      <div class="ph" style="margin-top:6px;">
+        <span id="matToggle">▸ INCIDENCIA</span>
+      </div>
+      <div id="incContent" class="pb" style="display:none;"></div>
+    </div>
+
+    <div id="nodeTooltip"></div>
+    <div id="syslog"></div>
+
+    <!-- FRACTAL OVERLAY -->
+    <div id="fractalOverlay">
+      <div id="fractalTop">
+        <span class="ft">◈ FRACTAL EXPLORER</span>
+        <div class="sp"></div>
+        <button id="btnCloseFractal" onclick="closeFractal()">✕ CERRAR</button>
+      </div>
+      <canvas id="fractalCanvas"></canvas>
+      <div id="fractalControls">
+        <button class="fc-btn on" id="fc-lsystem" onclick="setFractal('lsystem')">L-SYSTEM</button>
+        <button class="fc-btn" id="fc-sierpinski" onclick="setFractal('sierpinski')">SIERPIŃSKI</button>
+        <button class="fc-btn" id="fc-kochsnow" onclick="setFractal('kochsnow')">KOCH COPO</button>
+        <button class="fc-btn" id="fc-hilbert" onclick="setFractal('hilbert')">HILBERT</button>
+        <button class="fc-btn" id="fc-bfs" onclick="setFractal('bfs')">ÁRBOL BFS</button>
+        <button class="fc-btn" id="fc-mandelbrot" onclick="setFractal('mandelbrot')">MANDELBROT</button>
+      </div>
+      <div id="fractalInfo"></div>
+    </div>
   </div>
 
-  <!-- Barra de Herramientas -->
+  <!-- TOOLBAR -->
   <div id="toolbar">
-    <button class="cyber-btn active" id="btn-play">▶ PLAY</button>
-    <button class="cyber-btn" id="btn-build">⌨ BUILD</button>
-    <button class="cyber-btn" id="btn-analyze">◉ ANALYZE</button>
-    <button class="cyber-btn" id="btn-fractal">⌘ FRACTAL</button>
+    <button class="tb-btn on" id="tb-play" onclick="setMode('play')"><span class="tbicon">▶</span>PLAY</button>
+    <button class="tb-btn" id="tb-build" onclick="setMode('build')"><span class="tbicon">✦</span>BUILD</button>
+    <button class="tb-btn" id="tb-analyze" onclick="setMode('analyze')"><span class="tbicon">◉</span>ANALYZE</button>
+    <button class="tb-btn" id="tb-euler" onclick="setMode('euler')"><span class="tbicon">∿</span>EULER</button>
+    <button class="tb-btn" id="tb-fractal" onclick="openFractal()"><span class="tbicon">⌘</span>FRACTAL</button>
   </div>
+</div>
 
-  <script>
-    (function() {
-      const canvas = document.getElementById('game-canvas');
-      const ctx = canvas.getContext('2d');
-      
-      // --- AJUSTE DE LIENZO ---
-      function resizeCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-      }
-      window.addEventListener('resize', resizeCanvas);
-      resizeCanvas();
+<!-- HELP MODAL -->
+<div id="helpModal">
+  <div id="hBox">
+    <h2>◈ GRAPH LAB — MANUAL</h2>
+    <div class="hs"><h3>Modos</h3>
+      <b>▶ PLAY</b> — Toca nodos para construir un camino hamiltoniano (visitar todos una vez).<br>
+      <b>✦ BUILD</b> — Toca para añadir nodo. Arrastra de nodo a nodo para crear arista. Mantén pulsado un nodo para borrarlo.<br>
+      <b>◉ ANALYZE</b> — Toca cualquier nodo para ver sus propiedades. El panel lateral muestra el análisis completo del grafo, matrices de adyacencia, incidencia y laplaciano.<br>
+      <b>∿ EULER</b> — Traza todas las aristas sin repetir (camino euleriano). Nodos amarillos = grado impar.<br>
+      <b>⌘ FRACTAL</b> — Explorador de fractales generados desde la estructura del grafo actual.
+    </div>
+    <div class="hs"><h3>Teoría</h3>
+      <div class="hl">Camino Hamiltoniano: visitar cada NODO exactamente una vez.</div>
+      <div class="hl">Camino Euleriano: recorrer cada ARISTA exactamente una vez.</div>
+      Condición euleriana: <b>0 ó 2 nodos de grado impar</b>.<br>
+      Grado par → nodo violeta. Grado impar → nodo amarillo.
+    </div>
+    <div class="hs"><h3>Matrices y Álgebra Lineal</h3>
+      <b>Adyacencia A</b>: A[i][j] = número de aristas de i a j.<br>
+      <b>Incidencia B</b>: B[i][e] = -1 si la arista e sale de i, +1 si entra (dirigida); 1 en ambos extremos si no es dirigida.<br>
+      <b>Laplaciano L</b>: L = D - A (donde D es matriz diagonal de grados).<br>
+      <b>Traza de L</b> = suma de grados = 2·|E|. Número de componentes conexas = multiplicidad del 0 en el espectro de L.
+    </div>
+    <div class="hs"><h3>Fractales y grafos</h3>
+      Los fractales son <b>grafos auto-similares</b>: cada subgrafo tiene la misma estructura que el grafo completo.<br>
+      <b>L-System</b>: gramática de reemplazo de cadenas → genera grafos ramificados.<br>
+      <b>Sierpiński</b>: triángulo dividido recursivamente — el grafo de adyacencia es auto-similar.<br>
+      <b>Árbol BFS</b>: árbol de búsqueda en amplitud generado desde tu grafo actual.<br>
+      <b>Hilbert</b>: curva que llena el espacio — camino hamiltoniano en una cuadrícula.
+    </div>
+    <button id="btnCloseHelp" onclick="closeHelp()">Cerrar</button>
+  </div>
+</div>
 
-      // --- ESTADO GLOBAL DEL JUEGO ---
-      const GameState = {
-        mode: 'play', // 'play', 'build', 'analyze', 'fractal'
-        rank: 'SCRIPT_KIDDIE',
-        score: 0,
-        level: 1,
-        nodes: [],
-        edges: [],
-        selectedNode: null,
-        visitedNodes: new Set(),
-        path: [],
-        isAnimating: false,
-      };
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CORE STATE
+// ═══════════════════════════════════════════════════════════════════
+const S = {
+  mode: 'play',
+  score: 0, level: 1,
+  rank: 'INIT',
+  nodes: [], edges: [],
+  // play / hamilton
+  hamPath: [], hamVisited: new Set(),
+  // euler
+  eulerPath: [], eulerCurNode: -1, eulerUsed: new Set(), eulerStarted: false,
+  // build
+  buildDragFrom: -1, buildDragX: 0, buildDragY: 0, buildDragging: false,
+  longPressTimer: null,
+  nodeIdCounter: 0,
+  showIncidence: false,
+};
 
-      // --- NODOS Y ARISTAS ---
-      class Node {
-        constructor(id, x, y, z = 0) {
-          this.id = id;
-          this.x = x; this.y = y; this.z = z;
-          this.radius = 15;
-          this.visited = false;
+const RANKS = [
+  [0,'INIT'],[500,'SCRIPT_KID'],[1500,'SCRIPT_HAX'],[3000,'NET_RUNNER'],
+  [6000,'SYS_OP'],[10000,'CYPHER'],[20000,'GHOST'],[40000,'ORACLE']
+];
+
+function getrank(pts){ let r='INIT'; for(const[t,n] of RANKS){if(pts>=t)r=n;} return r; }
+
+// ═══════════════════════════════════════════════════════════════════
+// CANVAS
+// ═══════════════════════════════════════════════════════════════════
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const main = document.getElementById('main');
+let W=0, H=0, raf=null, animT=0;
+
+function resize(){
+  W = main.clientWidth; H = main.clientHeight;
+  cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio;
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  render();
+}
+window.addEventListener('resize', resize);
+
+// ═══════════════════════════════════════════════════════════════════
+// LEVEL PRESETS
+// ═══════════════════════════════════════════════════════════════════
+const LEVEL_PRESETS = [
+  { nodes:['A','B','C','D','E'], edgePairs:[[0,1],[1,2],[2,3],[3,4],[4,0]], directed:false },
+  { nodes:['A','B','C','D','E'], edgePairs:[[0,1],[1,2],[2,3],[3,4],[4,0],[0,2],[1,3]], directed:false },
+  { nodes:['A','B','C','D','E','F'], edgePairs:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[0,3],[1,4],[2,5]], directed:false },
+  { nodes:['S','A','B','C','T'], edgePairs:[[0,1],[0,2],[1,3],[2,3],[3,4],[1,4]], directed:true },
+  { nodes:['A','B','C','D'], edgePairs:[[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]], directed:false },
+];
+
+function loadLevel(lvl) {
+  const pr = LEVEL_PRESETS[Math.min(lvl-1, LEVEL_PRESETS.length-1)];
+  S.nodes = []; S.edges = [];
+  S.nodeIdCounter = pr.nodes.length;
+  const cx=W/2, cy=H/2;
+  const n=pr.nodes.length;
+  const r=Math.min(W,H)*0.3;
+  for(let i=0;i<n;i++){
+    const a=(2*Math.PI*i/n)-Math.PI/2;
+    S.nodes.push({ id:i, label:pr.nodes[i], x:cx+r*Math.cos(a), y:cy+r*Math.sin(a), r:18 });
+  }
+  pr.edgePairs.forEach(([a,b])=>{
+    S.edges.push({ id:S.edges.length, from:a, to:b, directed:pr.directed });
+  });
+  resetGameState();
+  updateHUD();
+  updateAnalysis();
+  sysLog(`Nivel ${lvl} cargado — modo ${S.mode.toUpperCase()}`);
+}
+
+function resetGameState(){
+  S.hamPath=[]; S.hamVisited=new Set();
+  S.eulerPath=[]; S.eulerCurNode=-1; S.eulerUsed=new Set(); S.eulerStarted=false;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// GRAPH MATH
+// ═══════════════════════════════════════════════════════════════════
+function getDegrees(){
+  const deg = S.nodes.map(_=>({out:0,in:0,total:0}));
+  S.edges.forEach(e=>{
+    deg[e.from].out++;
+    deg[e.to].in++;
+    deg[e.from].total++;
+    if(!e.directed) deg[e.to].total++;
+    else deg[e.to].total++;
+  });
+  return deg;
+}
+
+function getAdjMatrix(){
+  const n=S.nodes.length;
+  const A=Array.from({length:n},()=>new Array(n).fill(0));
+  S.edges.forEach(e=>{
+    A[e.from][e.to]++;
+    if(!e.directed) A[e.to][e.from]++;
+  });
+  return A;
+}
+
+function getIncidenceMatrix(){
+  const n=S.nodes.length;
+  const m=S.edges.length;
+  if(m===0) return [];
+  const B=Array.from({length:n},()=>new Array(m).fill(0));
+  S.edges.forEach((e,col)=>{
+    if(e.directed){
+      B[e.from][col] = -1;
+      B[e.to][col] = 1;
+    } else {
+      B[e.from][col] = 1;
+      B[e.to][col] = 1;
+    }
+  });
+  return B;
+}
+
+function getLaplacian(){
+  const n=S.nodes.length;
+  const A=getAdjMatrix();
+  const deg=getDegrees();
+  const L=Array.from({length:n},()=>new Array(n).fill(0));
+  for(let i=0;i<n;i++){
+    for(let j=0;j<n;j++){
+      if(i===j) L[i][j] = deg[i].total - A[i][i];
+      else L[i][j] = -A[i][j];
+    }
+  }
+  return L;
+}
+
+function isConnected(){
+  if(S.nodes.length===0) return true;
+  const visited=new Set([0]);
+  const queue=[0];
+  const adj=S.nodes.map(_=>[]);
+  S.edges.forEach(e=>{ adj[e.from].push(e.to); if(!e.directed)adj[e.to].push(e.from); });
+  while(queue.length){
+    const v=queue.shift();
+    for(const nb of adj[v]) if(!visited.has(nb)){visited.add(nb);queue.push(nb);}
+  }
+  return visited.size===S.nodes.length;
+}
+
+function isBipartite(){
+  const n=S.nodes.length;
+  const color=new Array(n).fill(-1);
+  for(let i=0;i<n;i++){
+    if(color[i]===-1){
+      const q=[i];
+      color[i]=0;
+      while(q.length){
+        const v=q.shift();
+        for(const e of S.edges){
+          let nb=null;
+          if(e.from===v) nb=e.to;
+          else if(!e.directed && e.to===v) nb=e.from;
+          if(nb===null) continue;
+          if(color[nb]===-1){ color[nb]=1-color[v]; q.push(nb); }
+          else if(color[nb]===color[v]) return false;
         }
       }
+    }
+  }
+  return true;
+}
 
-      class Edge {
-        constructor(from, to, type = 'directed') {
-          this.from = from;
-          this.to = to;
-          this.type = type;
-        }
+function eulerianStatus(){
+  const deg=getDegrees();
+  const oddNodes=S.nodes.filter((_,i)=>deg[i].total%2===1);
+  const conn=isConnected();
+  if(!conn) return {status:'disconnected',oddCount:oddNodes.length,oddIdx:oddNodes.map(n=>n.id)};
+  if(oddNodes.length===0) return {status:'circuit',oddCount:0,oddIdx:[]};
+  if(oddNodes.length===2) return {status:'path',oddCount:2,oddIdx:oddNodes.map(n=>n.id)};
+  return {status:'impossible',oddCount:oddNodes.length,oddIdx:oddNodes.map(n=>n.id)};
+}
+
+function hamiltonianHint(){
+  const n=S.nodes.length;
+  if(n>10) return null;
+  const adj=S.nodes.map(_=>[]);
+  S.edges.forEach(e=>{ adj[e.from].push(e.to); if(!e.directed)adj[e.to].push(e.from); });
+  const visited=new Array(n).fill(false);
+  let found=false;
+  function bt(v,count){
+    if(found) return;
+    if(count===n){found=true;return;}
+    for(const nb of adj[v]){
+      if(!visited[nb]){ visited[nb]=true; bt(nb,count+1); visited[nb]=false; }
+    }
+  }
+  for(let s=0;s<n;s++){ visited[s]=true; bt(s,1); visited[s]=false; if(found)break; }
+  return found;
+}
+
+function bfsTree(start){
+  const adj=S.nodes.map(_=>[]);
+  S.edges.forEach(e=>{ adj[e.from].push(e.to); if(!e.directed)adj[e.to].push(e.from); });
+  const visited=new Set([start]);
+  const tree=[];
+  const queue=[start];
+  while(queue.length){
+    const v=queue.shift();
+    for(const nb of adj[v]){
+      if(!visited.has(nb)){
+        visited.add(nb);
+        tree.push({from:v,to:nb});
+        queue.push(nb);
       }
+    }
+  }
+  return tree;
+}
 
-      // --- GENERADOR DE NIVELES SIMPLE ---
-      function generateLevel(level) {
-        const nodes = [];
-        const edges = [];
-        const count = 4 + level;
-        for (let i = 0; i < count; i++) {
-          const angle = (i / count) * Math.PI * 2;
-          const radius = 120;
-          nodes.push(new Node(i, canvas.width/2 + Math.cos(angle)*radius, canvas.height/2 + Math.sin(angle)*radius, 0));
-        }
-        // Conectar en anillo
-        for (let i = 0; i < count; i++) {
-          edges.push(new Edge(i, (i+1)%count, 'directed'));
-        }
-        return { nodes, edges };
+// ═══════════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════════
+function render(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#05070a';
+  ctx.fillRect(0,0,W,H);
+  for(let y=0;y<H;y+=4){
+    ctx.fillStyle='rgba(0,0,0,0.03)';
+    ctx.fillRect(0,y,W,1);
+  }
+
+  if(S.nodes.length===0){
+    ctx.fillStyle='rgba(0,230,118,0.25)';
+    ctx.font='12px JetBrains Mono, Share Tech Mono, monospace';
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillText('MODO BUILD: toca para añadir nodos',W/2,H/2);
+    ctx.textBaseline='alphabetic';
+    return;
+  }
+
+  const deg=getDegrees();
+  const euler=eulerianStatus();
+  const isEuler=S.mode==='euler';
+  const isAnalyze=S.mode==='analyze';
+
+  if(S.mode==='build'&&S.buildDragging&&S.buildDragFrom>=0){
+    const fn=S.nodes[S.buildDragFrom];
+    if(fn){
+      ctx.beginPath();ctx.moveTo(fn.x,fn.y);ctx.lineTo(S.buildDragX,S.buildDragY);
+      ctx.strokeStyle='rgba(0,230,118,0.4)';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);ctx.stroke();ctx.setLineDash([]);
+    }
+  }
+
+  let bfsEdges=new Set();
+  if(isAnalyze&&S.nodes.length>0){
+    const tree=bfsTree(0);
+    tree.forEach(te=>{
+      const key=`${Math.min(te.from,te.to)}_${Math.max(te.from,te.to)}`;
+      bfsEdges.add(key);
+    });
+  }
+
+  const edgeGroups={};
+  S.edges.forEach((e,i)=>{
+    const k=`${Math.min(e.from,e.to)}_${Math.max(e.from,e.to)}`;
+    if(!edgeGroups[k]) edgeGroups[k]=[];
+    edgeGroups[k].push(i);
+  });
+  const edgePlaced={};
+
+  S.edges.forEach((e,i)=>{
+    const k=`${Math.min(e.from,e.to)}_${Math.max(e.from,e.to)}`;
+    if(!edgePlaced[k]) edgePlaced[k]=0;
+    const myIdx=edgePlaced[k]; edgePlaced[k]++;
+    const total=edgeGroups[k].length;
+    const fn=S.nodes[e.from],tn=S.nodes[e.to];
+    if(!fn||!tn) return;
+    const isUsed=S.eulerUsed.has(i);
+    const isBFS=bfsEdges.has(k);
+
+    ctx.save();
+    if(isEuler&&isUsed) ctx.strokeStyle='rgba(0,230,118,0.9)', ctx.lineWidth=3.5;
+    else if(isEuler&&!isUsed) ctx.strokeStyle='rgba(0,230,118,0.25)', ctx.lineWidth=2;
+    else if(isAnalyze&&isBFS) ctx.strokeStyle='rgba(0,229,255,0.7)', ctx.lineWidth=2.5;
+    else ctx.strokeStyle='rgba(0,230,118,0.3)', ctx.lineWidth=1.8;
+
+    if(e.from===e.to){
+      ctx.beginPath();ctx.arc(fn.x,fn.y-fn.r-14,14,0,Math.PI*2);ctx.stroke();
+    } else {
+      const dx=tn.x-fn.x,dy=tn.y-fn.y,len=Math.sqrt(dx*dx+dy*dy);
+      const nx=-dy/len,ny=dx/len;
+      const off=total>1?(myIdx-(total-1)/2)*14:0;
+      const mx=(fn.x+tn.x)/2+nx*off,my=(fn.y+tn.y)/2+ny*off;
+      if(total>1||off!==0){
+        ctx.beginPath();ctx.moveTo(fn.x,fn.y);ctx.quadraticCurveTo(mx,my,tn.x,tn.y);ctx.stroke();
+      } else {
+        ctx.beginPath();ctx.moveTo(fn.x,fn.y);ctx.lineTo(tn.x,tn.y);ctx.stroke();
       }
-
-      function loadLevel(level) {
-        const { nodes, edges } = generateLevel(level);
-        GameState.nodes = nodes;
-        GameState.edges = edges;
-        GameState.visitedNodes.clear();
-        GameState.path = [];
-        GameState.selectedNode = null;
-        updateHUD();
+      if(e.directed){
+        const t2=0.75;
+        const qx=(1-t2)*(1-t2)*fn.x+2*(1-t2)*t2*mx+t2*t2*tn.x;
+        const qy=(1-t2)*(1-t2)*fn.y+2*(1-t2)*t2*my+t2*t2*tn.y;
+        const tdx=2*(1-t2)*(mx-fn.x)+2*t2*(tn.x-mx);
+        const tdy=2*(1-t2)*(my-fn.y)+2*t2*(tn.y-my);
+        const tlen=Math.sqrt(tdx*tdx+tdy*tdy);
+        const ax=tdx/tlen,ay=tdy/tlen;
+        ctx.fillStyle=ctx.strokeStyle;
+        ctx.beginPath();ctx.moveTo(qx+ax*8,qy+ay*8);
+        ctx.lineTo(qx-ay*5,qy+ax*5);ctx.lineTo(qx+ay*5,qy-ax*5);
+        ctx.closePath();ctx.fill();
       }
-
-      // --- ACTUALIZAR HUD ---
-      function updateHUD() {
-        document.getElementById('hud-rank').textContent = GameState.rank;
-        document.getElementById('hud-score').textContent = String(GameState.score).padStart(4, '0');
-        document.getElementById('hud-level').textContent = String(GameState.level).padStart(2, '0');
+      if(isEuler&&isUsed){
+        ctx.fillStyle='rgba(0,230,118,0.8)';
+        ctx.beginPath();ctx.arc(mx,my,4,0,Math.PI*2);ctx.fill();
       }
+    }
+    ctx.restore();
+  });
 
-      // --- TERMINAL DE LOG ---
-      function sysLog(message) {
-        const logEl = document.getElementById('sys-log');
-        document.getElementById('log-text').textContent = message;
-        logEl.style.display = 'block';
-        setTimeout(() => { logEl.style.display = 'none'; }, 4000);
+  if(S.mode==='play'&&S.hamPath.length>1){
+    ctx.save();ctx.strokeStyle='rgba(0,229,255,0.7)';ctx.lineWidth=3;
+    ctx.shadowColor='#00e5ff';ctx.shadowBlur=8;
+    ctx.beginPath();
+    for(let i=0;i<S.hamPath.length-1;i++){
+      const a=S.nodes[S.hamPath[i]],b=S.nodes[S.hamPath[i+1]];
+      if(a&&b){ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);}
+    }
+    ctx.stroke();ctx.shadowBlur=0;ctx.restore();
+  }
+
+  if(isEuler&&S.eulerPath.length>1){
+    ctx.save();ctx.strokeStyle='rgba(255,255,100,0.6)';ctx.lineWidth=2;
+    ctx.beginPath();
+    S.eulerPath.forEach((ni,i)=>{
+      const nd=S.nodes[ni];if(!nd)return;
+      if(i===0) ctx.moveTo(nd.x,nd.y); else ctx.lineTo(nd.x,nd.y);
+    });
+    ctx.stroke();ctx.restore();
+  }
+
+  S.nodes.forEach((n,i)=>{
+    const isSel=S.hamPath[S.hamPath.length-1]===i||(isEuler&&S.eulerCurNode===i);
+    const isHamVisited=S.hamVisited.has(i);
+    const isOdd=deg[i].total%2===1;
+    const pulse=0.5+0.5*Math.sin(animT*2+i);
+
+    if(isSel){
+      ctx.beginPath();ctx.arc(n.x,n.y,n.r+8+3*pulse,0,Math.PI*2);
+      ctx.fillStyle=`rgba(0,229,255,${0.1+0.08*pulse})`;ctx.fill();
+    }
+
+    ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+    if(isSel) ctx.fillStyle='rgba(0,229,255,0.15)';
+    else if(isHamVisited) ctx.fillStyle='rgba(0,230,118,0.15)';
+    else if(isEuler&&isOdd) ctx.fillStyle='rgba(255,179,0,0.1)';
+    else ctx.fillStyle='rgba(0,20,10,0.9)';
+    ctx.fill();
+
+    ctx.strokeStyle=isSel?'#00e5ff':isHamVisited?'#00e676':isEuler&&isOdd?'#ffb300':'#00e67666';
+    ctx.lineWidth=isSel?2.5:1.5;ctx.stroke();
+
+    ctx.fillStyle=isSel?'#00e5ff':isHamVisited?'#00e676':isEuler&&isOdd?'#ffb300':'#00e676';
+    ctx.font='500 11px JetBrains Mono, monospace';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(n.label,n.x,n.y);
+    ctx.textBaseline='alphabetic';
+
+    const d=deg[i];
+    ctx.font='8px JetBrains Mono, monospace';
+    ctx.fillStyle='rgba(0,230,118,0.4)';
+    ctx.textAlign='center';
+    const dText=S.edges.some(e=>e.directed)?`+${d.out}−${d.in}`:String(d.total);
+    ctx.fillText(dText,n.x,n.y+n.r+10);
+
+    const hi=S.hamPath.indexOf(i);
+    if(S.mode==='play'&&hi>=0){
+      ctx.beginPath();ctx.arc(n.x+n.r,n.y-n.r,7,0,Math.PI*2);
+      ctx.fillStyle='#00e5ff';ctx.fill();
+      ctx.fillStyle='#05070a';ctx.font='bold 8px JetBrains Mono';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(String(hi+1),n.x+n.r,n.y-n.r);
+      ctx.textBaseline='alphabetic';
+    }
+  });
+}
+
+function startLoop(){
+  if(raf) return;
+  function loop(){animT+=0.02;render();raf=requestAnimationFrame(loop);}loop();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INTERACTION
+// ═══════════════════════════════════════════════════════════════════
+function nodeAt(x,y){
+  for(let i=S.nodes.length-1;i>=0;i--){
+    if(Math.hypot(S.nodes[i].x-x,S.nodes[i].y-y)<S.nodes[i].r+8) return i;
+  }
+  return -1;
+}
+
+function evCoords(e){
+  const r=cv.getBoundingClientRect();
+  const src=e.touches?e.touches[0]||e.changedTouches[0]:e;
+  return [src.clientX-r.left,src.clientY-r.top];
+}
+
+cv.addEventListener('touchstart',e=>{e.preventDefault();handleDown(...evCoords(e),e);},{passive:false});
+cv.addEventListener('mousedown',e=>handleDown(e.clientX-cv.getBoundingClientRect().left,e.clientY-cv.getBoundingClientRect().top,e));
+cv.addEventListener('touchmove',e=>{e.preventDefault();handleMove(...evCoords(e));},{passive:false});
+cv.addEventListener('mousemove',e=>{if(S.buildDragging)handleMove(e.clientX-cv.getBoundingClientRect().left,e.clientY-cv.getBoundingClientRect().top);});
+cv.addEventListener('touchend',e=>{e.preventDefault();handleUp(...evCoords(e));},{passive:false});
+cv.addEventListener('mouseup',e=>handleUp(e.clientX-cv.getBoundingClientRect().left,e.clientY-cv.getBoundingClientRect().top));
+
+function handleDown(x,y,e){
+  const ni=nodeAt(x,y);
+  if(S.mode==='build'){
+    if(ni>=0){
+      S.buildDragFrom=ni;
+      S.buildDragging=true;
+      S.buildDragX=x;S.buildDragY=y;
+      S.longPressTimer=setTimeout(()=>{
+        S.nodes.splice(ni,1);
+        S.edges=S.edges.filter(e2=>e2.from!==ni&&e2.to!==ni).map(e2=>({
+          ...e2,
+          from:e2.from>ni?e2.from-1:e2.from,
+          to:e2.to>ni?e2.to-1:e2.to
+        }));
+        S.buildDragFrom=-1;S.buildDragging=false;
+        sysLog('Nodo eliminado');updateHUD();updateAnalysis();
+      },600);
+    }
+  }
+}
+
+function handleMove(x,y){
+  if(S.mode==='build'&&S.buildDragging){
+    if(S.longPressTimer){clearTimeout(S.longPressTimer);S.longPressTimer=null;}
+    S.buildDragX=x;S.buildDragY=y;
+  }
+  if(S.mode==='analyze'){
+    const ni=nodeAt(x,y);
+    const tt=document.getElementById('nodeTooltip');
+    if(ni>=0){
+      const n=S.nodes[ni];
+      const deg=getDegrees()[ni];
+      const A=getAdjMatrix();
+      const neighbors=S.edges.filter(e=>e.from===ni||(!e.directed&&e.to===ni)).map(e=>S.nodes[e.from===ni?e.to:e.from]?.label);
+      tt.style.display='block';
+      tt.style.left=Math.min(x+12,W-140)+'px';
+      tt.style.top=Math.max(y-60,10)+'px';
+      tt.innerHTML=`<div style="color:#00e5ff;font-size:10px;margin-bottom:4px">${n.label} — NODE ${ni}</div>
+<div style="color:#008f11">deg: <span style="color:#ffb300">${deg.total}</span> ${deg.total%2===1?'(ODD)':'(EVEN)'}</div>
+<div style="color:#008f11">out: ${deg.out} | in: ${deg.in}</div>
+<div style="color:#008f11">adj: [${neighbors.join(',')}]</div>
+<div style="color:#008f11">row A[${ni}]: [${A[ni].join(',')}]</div>`;
+    } else { tt.style.display='none'; }
+  }
+}
+
+function handleUp(x,y){
+  if(S.longPressTimer){clearTimeout(S.longPressTimer);S.longPressTimer=null;}
+  const ni=nodeAt(x,y);
+
+  if(S.mode==='build'){
+    if(S.buildDragging&&S.buildDragFrom>=0){
+      if(ni>=0&&ni!==S.buildDragFrom){
+        S.edges.push({id:S.edges.length,from:S.buildDragFrom,to:ni,directed:false});
+        sysLog(`Arista añadida: ${S.nodes[S.buildDragFrom].label}—${S.nodes[ni].label}`);
+        updateAnalysis();updateHUD();
       }
+    } else if(ni<0){
+      const id=S.nodeIdCounter++;
+      const label=String.fromCharCode(65+S.nodes.length%26)+(S.nodes.length>=26?Math.floor(S.nodes.length/26):'');
+      S.nodes.push({id,label,x,y,r:18});
+      sysLog(`Nodo ${label} añadido`);updateHUD();updateAnalysis();
+    }
+    S.buildDragFrom=-1;S.buildDragging=false;
+    return;
+  }
 
-      // --- DIBUJO PRINCIPAL ---
-      function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Fondo con efecto matrix
-        ctx.fillStyle = '#0a0c0f';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Dibujar aristas
-        GameState.edges.forEach(edge => {
-          const fromNode = GameState.nodes.find(n => n.id === edge.from);
-          const toNode = GameState.nodes.find(n => n.id === edge.to);
-          if (!fromNode || !toNode) return;
-          
-          ctx.beginPath();
-          ctx.moveTo(fromNode.x, fromNode.y);
-          ctx.lineTo(toNode.x, toNode.y);
-          ctx.strokeStyle = '#00ff4133';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          
-          // Flecha dirigida
-          if (edge.type === 'directed') {
-            const angle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
-            const arrowX = toNode.x - 15 * Math.cos(angle);
-            const arrowY = toNode.y - 15 * Math.sin(angle);
-            ctx.fillStyle = '#00ff41';
-            ctx.beginPath();
-            ctx.moveTo(arrowX, arrowY);
-            ctx.lineTo(arrowX - 8 * Math.cos(angle - Math.PI/6), arrowY - 8 * Math.sin(angle - Math.PI/6));
-            ctx.lineTo(arrowX - 8 * Math.cos(angle + Math.PI/6), arrowY - 8 * Math.sin(angle + Math.PI/6));
-            ctx.closePath();
-            ctx.fill();
-          }
-        });
-        
-        // Dibujar camino de infiltración
-        if (GameState.path.length > 1) {
-          ctx.beginPath();
-          ctx.strokeStyle = '#00ff41';
-          ctx.lineWidth = 4;
-          ctx.shadowColor = '#00ff41';
-          ctx.shadowBlur = 10;
-          for (let i = 0; i < GameState.path.length - 1; i++) {
-            const fromNode = GameState.nodes.find(n => n.id === GameState.path[i]);
-            const toNode = GameState.nodes.find(n => n.id === GameState.path[i+1]);
-            if (fromNode && toNode) {
-              ctx.moveTo(fromNode.x, fromNode.y);
-              ctx.lineTo(toNode.x, toNode.y);
-            }
-          }
-          ctx.stroke();
-          ctx.shadowBlur = 0;
-        }
-        
-        // Dibujar nodos
-        GameState.nodes.forEach(node => {
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
-          ctx.fillStyle = node.visited ? '#00ff41' : '#1a2a1a';
-          ctx.fill();
-          ctx.strokeStyle = '#00ff41';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 14px "Share Tech Mono"';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(node.id, node.x, node.y);
-        });
-      }
+  if(ni<0) return;
 
-      // --- LÓGICA DE INFILTRACIÓN (HAMILTONIANO) ---
-      function handleNodeClick(nodeId) {
-        if (GameState.mode !== 'play') return;
-        const node = GameState.nodes.find(n => n.id === nodeId);
-        if (!node || node.visited) return;
-        
-        // Verificar adyacencia
-        const lastVisited = GameState.path.length > 0 ? GameState.path[GameState.path.length - 1] : null;
-        if (lastVisited !== null) {
-          const edge = GameState.edges.find(e => e.from === lastVisited && e.to === nodeId);
-          if (!edge) {
-            sysLog('ERROR: Nodo no adyacente. La ruta debe ser contigua.');
-            return;
-          }
-        }
-        
-        // Marcar nodo como visitado y añadir al camino
-        node.visited = true;
-        GameState.visitedNodes.add(nodeId);
-        GameState.path.push(nodeId);
-        GameState.selectedNode = nodeId;
-        
-        // Comprobar victoria
-        if (GameState.visitedNodes.size === GameState.nodes.length) {
-          GameState.score += 1000 * GameState.level;
-          GameState.level++;
-          sysLog(`INFILTRACIÓN EXITOSA. Nivel ${GameState.level - 1} completado. +${1000 * (GameState.level-1)} PI.`);
-          loadLevel(GameState.level);
-        }
-        
-        updateHUD();
-      }
+  if(S.mode==='play') handleHamilton(ni);
+  else if(S.mode==='analyze') handleAnalyzeClick(ni);
+  else if(S.mode==='euler') handleEuler(ni);
+}
 
-      // --- EVENTOS DE INTERFAZ ---
-      canvas.addEventListener('click', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const x = (e.clientX - rect.left) * scaleX;
-        const y = (e.clientY - rect.top) * scaleY;
-        
-        const clickedNode = GameState.nodes.find(n => Math.hypot(n.x - x, n.y - y) < n.radius + 5);
-        if (clickedNode) {
-          handleNodeClick(clickedNode.id);
-        }
-      });
+function getEdgeBetween(a,b){
+  return S.edges.find(e=>(e.from===a&&e.to===b)||((!e.directed)&&e.from===b&&e.to===a));
+}
 
-      // --- CAMBIO DE MODO ---
-      document.getElementById('btn-play').addEventListener('click', () => {
-        GameState.mode = 'play';
-        document.querySelectorAll('.cyber-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById('btn-play').classList.add('active');
-        loadLevel(GameState.level);
-        sysLog('Modo INFILTRACIÓN activado. Encuentra el camino hamiltoniano.');
-      });
+function handleHamilton(ni){
+  if(S.hamVisited.has(ni)){sysLog('Nodo ya visitado');return;}
+  if(S.hamPath.length>0){
+    const last=S.hamPath[S.hamPath.length-1];
+    if(!getEdgeBetween(last,ni)){sysLog('No hay arista — nodos no adyacentes');return;}
+  }
+  S.hamPath.push(ni);S.hamVisited.add(ni);
+  const bonus=S.hamPath.length*50*S.level;
+  S.score+=bonus;
+  if(S.hamVisited.size===S.nodes.length){
+    S.score+=1000*S.level;
+    S.level++;
+    sysLog(`✓ Camino hamiltoniano completado! +${1000*(S.level-1)} PI — cargando nivel ${S.level}`);
+    setTimeout(()=>loadLevel(S.level),1800);
+  } else {
+    sysLog(`Nodo ${S.nodes[ni].label} — ${S.hamVisited.size}/${S.nodes.length}`);
+  }
+  S.rank=getrank(S.score);updateHUD();
+}
 
-      document.getElementById('btn-fractal').addEventListener('click', () => {
-        GameState.mode = 'fractal';
-        sysLog('Accediendo a datos fractales... No implementado aún.');
-      });
+function getUnusedEdge(a,b){
+  for(let i=0;i<S.edges.length;i++){
+    const e=S.edges[i];
+    if(!S.eulerUsed.has(i)&&((e.from===a&&e.to===b)||(!e.directed&&e.from===b&&e.to===a))) return i;
+  }
+  return -1;
+}
 
-      // --- INICIO ---
-      loadLevel(1);
-      
-      function gameLoop() {
-        draw();
-        requestAnimationFrame(gameLoop);
-      }
-      gameLoop();
-      
-      sysLog('NetHack: Pathfinder v0.1.0 - Iniciando secuencia de infiltración...');
-    })();
-  </script>
+function handleEuler(ni){
+  if(!S.eulerStarted){
+    S.eulerStarted=true;S.eulerCurNode=ni;S.eulerPath=[ni];
+    const eu=eulerianStatus();
+    if(eu.status==='impossible') sysLog(`⚠ ${eu.oddCount} nodos impares — imposible. ¡Inténtalo igual!`);
+    else if(eu.status==='path'&&eu.oddIdx.indexOf(ni)<0) sysLog('Pista: empieza en nodo amarillo (grado impar)');
+    else sysLog(`Iniciando desde ${S.nodes[ni].label}`);
+    return;
+  }
+  if(ni===S.eulerCurNode){
+    const li=S.edges.findIndex((e,i)=>e.from===ni&&e.to===ni&&!S.eulerUsed.has(i));
+    if(li>=0){S.eulerUsed.add(li);S.eulerPath.push(ni);S.score+=10;updateHUD();}
+    return;
+  }
+  const ei=getUnusedEdge(S.eulerCurNode,ni);
+  if(ei<0){sysLog(`No hay arista libre de ${S.nodes[S.eulerCurNode].label} a ${S.nodes[ni].label}`);return;}
+  S.eulerUsed.add(ei);S.eulerPath.push(ni);S.eulerCurNode=ni;
+  S.score+=10;updateHUD();
+  const remaining=S.edges.length-S.eulerUsed.size;
+  if(remaining===0){
+    S.score+=500;S.rank=getrank(S.score);updateHUD();
+    sysLog(`✓ ¡CAMINO EULERIANO COMPLETADO! +500 PI`);
+  } else {
+    const hasMove=S.edges.some((e,i)=>!S.eulerUsed.has(i)&&(e.from===S.eulerCurNode||(!e.directed&&e.to===S.eulerCurNode)));
+    if(!hasMove) sysLog(`Atascado con ${remaining} aristas pendientes`);
+    else sysLog(`${remaining} aristas restantes`);
+  }
+}
+
+function handleAnalyzeClick(ni){
+  const n=S.nodes[ni];
+  sysLog(`Analizando nodo ${n.label}`);
+  document.getElementById('matPanel').style.display='block';
+  document.getElementById('anaPanel').style.display='block';
+  updateAnalysis();
+}
+
+function updateAnalysis(){
+  const n=S.nodes.length;
+  if(n===0) return;
+  const A=getAdjMatrix();
+  const deg=getDegrees();
+  const eu=eulerianStatus();
+  const ham=hamiltonianHint();
+  const bipartite=isBipartite();
+  const L=getLaplacian();
+
+  // Matriz de adyacencia
+  let mat='   ';
+  S.nodes.forEach(nd=>mat+=nd.label.padStart(3));
+  mat+='\n';
+  A.forEach((row,i)=>{
+    mat+=S.nodes[i].label.padStart(2)+' ';
+    row.forEach(v=>mat+=(v===0?'·':String(v)).padStart(3));
+    mat+='\n';
+  });
+  document.getElementById('matContent').textContent=mat;
+
+  // Matriz de incidencia
+  const B=getIncidenceMatrix();
+  let incStr='    ';
+  S.edges.forEach((_,i)=>incStr+=`e${i}`.padStart(4));
+  incStr+='\n';
+  B.forEach((row,i)=>{
+    incStr+=S.nodes[i].label.padStart(2)+' ';
+    row.forEach(v=>incStr+=(v===0?'·':v>0?'+'+v:v).toString().padStart(4));
+    incStr+='\n';
+  });
+  document.getElementById('incContent').textContent=incStr;
+
+  // Laplaciano traza = suma grados
+  let traceL=0;
+  for(let i=0;i<n;i++) traceL+=L[i][i];
+
+  const euColor=eu.status==='circuit'?'ok':eu.status==='path'?'warn':'bad';
+  const hamColor=ham===true?'ok':ham===false?'bad':'warn';
+  const bipartiteColor=bipartite?'ok':'warn';
+
+  document.getElementById('anaContent').innerHTML=`
+    <div class="ana-row"><span class="ak">Nodos</span><span class="av info">${n}</span></div>
+    <div class="ana-row"><span class="ak">Aristas</span><span class="av info">${S.edges.length}</span></div>
+    <div class="ana-row"><span class="ak">Conexo</span><span class="av ${isConnected()?'ok':'bad'}">${isConnected()?'SÍ':'NO'}</span></div>
+    <div class="ana-row"><span class="ak">Bipartito</span><span class="av ${bipartiteColor}">${bipartite?'SÍ':'NO'}</span></div>
+    <div class="ana-row"><span class="ak">Euler</span><span class="av ${euColor}">${eu.status.toUpperCase()}</span></div>
+    <div class="ana-row"><span class="ak">Nodos imp.</span><span class="av ${eu.oddCount===0?'ok':eu.oddCount===2?'warn':'bad'}">${eu.oddCount}</span></div>
+    <div class="ana-row"><span class="ak">Hamilton</span><span class="av ${hamColor}">${ham===null?'N/A':ham?'EXISTE':'NO EXISTE'}</span></div>
+    <div class="ana-row"><span class="ak">Traza L</span><span class="av">${traceL} (= ∑deg = 2·|E|)</span></div>
+  `;
+}
+
+function updateHUD(){
+  document.getElementById('hLevel').textContent=String(S.level).padStart(2,'0');
+  document.getElementById('hScore').textContent=String(S.score).padStart(4,'0');
+  document.getElementById('hRank').textContent=S.rank||'INIT';
+  document.getElementById('hNodes').textContent=S.nodes.length;
+  document.getElementById('hEdges').textContent=S.edges.length;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MODES
+// ═══════════════════════════════════════════════════════════════════
+function setMode(m){
+  S.mode=m;
+  document.querySelectorAll('.tb-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('tb-'+m).classList.add('on');
+  resetGameState();
+  document.getElementById('matPanel').style.display=m==='analyze'?'block':'none';
+  document.getElementById('anaPanel').style.display=m==='analyze'?'block':'none';
+  document.getElementById('nodeTooltip').style.display='none';
+  if(m==='analyze') updateAnalysis();
+  if(m==='euler'){
+    const eu=eulerianStatus();
+    sysLog(`EULER: ${eu.oddCount} nodos impares — ${eu.status}`);
+  }
+  if(m==='build') sysLog('BUILD: toca=nodo | arrastra=arista | mantén=borrar');
+  if(m==='play') sysLog('PLAY: camino hamiltoniano — visita todos los nodos');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FRACTAL ENGINE
+// ═══════════════════════════════════════════════════════════════════
+const fcv = document.getElementById('fractalCanvas');
+const fctx = fcv.getContext('2d');
+let fractalType = 'lsystem';
+let fractalRaf = null;
+
+function openFractal(){
+  document.getElementById('fractalOverlay').classList.add('show');
+  resizeFractal();
+  drawFractal();
+}
+function closeFractal(){
+  document.getElementById('fractalOverlay').classList.remove('show');
+  if(fractalRaf){cancelAnimationFrame(fractalRaf);fractalRaf=null;}
+}
+function setFractal(type){
+  fractalType=type;
+  document.querySelectorAll('.fc-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('fc-'+type).classList.add('on');
+  drawFractal();
+}
+function resizeFractal(){
+  const c=fcv;
+  const w=c.parentElement.clientWidth;
+  const h=c.parentElement.clientHeight - c.parentElement.querySelector('#fractalControls').offsetHeight - 
+    c.parentElement.querySelector('#fractalTop').offsetHeight - 
+    c.parentElement.querySelector('#fractalInfo').offsetHeight;
+  c.width=w*devicePixelRatio;c.height=Math.max(h,200)*devicePixelRatio;
+  c.style.width=w+'px';c.style.height=Math.max(h,200)+'px';
+  fctx.scale(devicePixelRatio,devicePixelRatio);
+}
+function drawFractal(){
+  if(fractalRaf){cancelAnimationFrame(fractalRaf);fractalRaf=null;}
+  const W2=fcv.width/devicePixelRatio,H2=fcv.height/devicePixelRatio;
+  fctx.clearRect(0,0,W2,H2);
+  fctx.fillStyle='#05070a';fctx.fillRect(0,0,W2,H2);
+  const infos = {
+    lsystem:  'L-System: gramática F→F+F−F−F+F. Cada F es una arista; +/− giran 90°. Autosimilaridad recursiva.',
+    sierpinski:'Triángulo de Sierpiński: subdivisión en 3 triángulos. Dimensión fractal D=log3/log2≈1.585.',
+    kochsnow: 'Copo de Koch: cada arista se reemplaza por 4 segmentos. Perímetro → ∞, área finita.',
+    hilbert:  'Curva de Hilbert: camino hamiltoniano en cuadrícula 2ⁿ×2ⁿ. Visita todos los nodos una vez.',
+    bfs:      'Árbol BFS del grafo actual: arcos de árbol (cyan) y aristas cruzadas (rosa).',
+    mandelbrot:'Conjunto de Mandelbrot: z_{n+1}=z_n²+c. Frontera fractal; los puntos internos son conexos.'
+  };
+  document.getElementById('fractalInfo').textContent=infos[fractalType]||'';
+  switch(fractalType){
+    case 'lsystem':    drawLSystem(W2,H2);    break;
+    case 'sierpinski': drawSierpinski(W2,H2); break;
+    case 'kochsnow':   drawKochSnow(W2,H2);   break;
+    case 'hilbert':    drawHilbert(W2,H2);    break;
+    case 'bfs':        drawBFSTree(W2,H2);    break;
+    case 'mandelbrot': drawMandelbrot(W2,H2); break;
+  }
+}
+// (Las funciones de dibujo de fractales se mantienen sin cambios, solo se ajustan colores según las variables)
+function drawLSystem(W2,H2){
+  let str='F-F-F-F';
+  const rules={'F':'F+F-F-F+F'};
+  for(let i=0;i<3;i++) str=str.split('').map(c=>rules[c]||c).join('');
+  const len=W2*0.012;
+  let x=W2*0.12,y=H2*0.85,a=-Math.PI/2;
+  fctx.strokeStyle='#00e676';fctx.lineWidth=0.8;
+  fctx.shadowColor='rgba(0,230,118,0.3)';fctx.shadowBlur=2;
+  fctx.beginPath();fctx.moveTo(x,y);
+  for(const c of str){
+    if(c==='F'){x+=len*Math.cos(a);y+=len*Math.sin(a);fctx.lineTo(x,y);}
+    else if(c==='+') a+=Math.PI/2;
+    else if(c==='-') a-=Math.PI/2;
+  }
+  fctx.stroke();fctx.shadowBlur=0;
+  fctx.fillStyle='#00e676';
+  fctx.beginPath();fctx.arc(W2*0.12,H2*0.85,3,0,Math.PI*2);fctx.fill();
+}
+function drawSierpinski(W2,H2){
+  const depth=6,margin=30,bx=margin,by=H2-margin,tx=W2/2,ty=margin,rx=W2-margin;
+  function tri(ax,ay,bx2,by2,cx,cy,d){
+    if(d===0){fctx.beginPath();fctx.moveTo(ax,ay);fctx.lineTo(bx2,by2);fctx.lineTo(cx,cy);fctx.closePath();fctx.fillStyle='rgba(0,230,118,0.85)';fctx.fill();return;}
+    const mx1=(ax+bx2)/2,my1=(ay+by2)/2,mx2=(bx2+cx)/2,my2=(by2+cy)/2,mx3=(ax+cx)/2,my3=(ay+cy)/2;
+    tri(ax,ay,mx1,my1,mx3,my3,d-1);tri(mx1,my1,bx2,by2,mx2,my2,d-1);tri(mx3,my3,mx2,my2,cx,cy,d-1);
+  }
+  function triStroke(ax,ay,bx2,by2,cx,cy,d){
+    if(d===0){fctx.beginPath();fctx.moveTo(ax,ay);fctx.lineTo(bx2,by2);fctx.lineTo(cx,cy);fctx.closePath();fctx.strokeStyle=`rgba(0,230,118,${0.1+0.9*(1-d/depth)})`;fctx.lineWidth=0.5;fctx.stroke();return;}
+    const mx1=(ax+bx2)/2,my1=(ay+by2)/2,mx2=(bx2+cx)/2,my2=(by2+cy)/2,mx3=(ax+cx)/2,my3=(ay+cy)/2;
+    triStroke(ax,ay,mx1,my1,mx3,my3,d-1);triStroke(mx1,my1,bx2,by2,mx2,my2,d-1);triStroke(mx3,my3,mx2,my2,cx,cy,d-1);
+  }
+  triStroke(bx,by,tx,ty,rx,by,depth);tri(bx,by,tx,ty,rx,by,depth-1);
+}
+function kochPoints(ax,ay,bx2,by2,d){
+  if(d===0) return[[ax,ay],[bx2,by2]];
+  const dx=(bx2-ax)/3,dy=(by2-ay)/3,p1=[ax+dx,ay+dy],p2=[ax+2*dx,ay+2*dy];
+  const mx=(ax+bx2)/2-(by2-ay)*Math.sqrt(3)/6,my=(ay+by2)/2+(bx2-ax)*Math.sqrt(3)/6;
+  return[...kochPoints(ax,ay,p1[0],p1[1],d-1).slice(0,-1),...kochPoints(p1[0],p1[1],mx,my,d-1).slice(0,-1),...kochPoints(mx,my,p2[0],p2[1],d-1).slice(0,-1),...kochPoints(p2[0],p2[1],bx2,by2,d-1)];
+}
+function drawKochSnow(W2,H2){
+  const cx=W2/2,cy=H2/2,r=Math.min(W2,H2)*0.38;
+  const pts=[[cx,cy-r],[cx+r*Math.sin(2*Math.PI/3),cy-r*Math.cos(2*Math.PI/3)],[cx+r*Math.sin(4*Math.PI/3),cy-r*Math.cos(4*Math.PI/3)]];
+  fctx.strokeStyle='rgba(0,229,255,0.9)';fctx.lineWidth=1;
+  fctx.shadowColor='rgba(0,229,255,0.3)';fctx.shadowBlur=3;
+  fctx.beginPath();
+  [[0,1],[1,2],[2,0]].forEach(([i,j])=>{
+    const kp=kochPoints(pts[i][0],pts[i][1],pts[j][0],pts[j][1],4);
+    kp.forEach(([x,y],k)=>k===0?fctx.moveTo(x,y):fctx.lineTo(x,y));
+  });
+  fctx.closePath();fctx.stroke();fctx.shadowBlur=0;
+  fctx.fillStyle='rgba(0,229,255,0.7)';
+  pts.forEach(([x,y])=>{fctx.beginPath();fctx.arc(x,y,4,0,Math.PI*2);fctx.fill();});
+}
+function drawHilbert(W2,H2){
+  const order=5,N=Math.pow(2,order),size=Math.min(W2,H2)*0.85,step=size/N,ox=(W2-size)/2,oy=(H2-size)/2;
+  function d2xy(n,d){let x=0,y=0,s=1,t=d;while(s<n){const rx=1&(t/2),ry=1&(t^rx);if(ry===0){if(rx===1){x=s-1-x;y=s-1-y;}[x,y]=[y,x];}x+=s*rx;y+=s*ry;t=Math.floor(t/4);s*=2;}return[x,y];}
+  fctx.beginPath();
+  for(let i=0;i<N*N;i++){
+    const[x,y]=d2xy(N,i);
+    const px=ox+(x+0.5)*step,py=oy+(y+0.5)*step;
+    i===0?fctx.moveTo(px,py):fctx.lineTo(px,py);
+  }
+  const grad=fctx.createLinearGradient(ox,oy,ox+size,oy+size);
+  grad.addColorStop(0,'#00e676');grad.addColorStop(0.5,'#00e5ff');grad.addColorStop(1,'#b388ff');
+  fctx.strokeStyle=grad;fctx.lineWidth=1.2;fctx.stroke();
+  const[sx,sy]=d2xy(N,0);const[ex,ey]=d2xy(N,N*N-1);
+  fctx.fillStyle='#ffb300';fctx.beginPath();fctx.arc(ox+(sx+0.5)*step,oy+(sy+0.5)*step,5,0,Math.PI*2);fctx.fill();
+  fctx.fillStyle='#ff5252';fctx.beginPath();fctx.arc(ox+(ex+0.5)*step,oy+(ey+0.5)*step,5,0,Math.PI*2);fctx.fill();
+  fctx.fillStyle='#00e676';fctx.font='9px JetBrains Mono';fctx.textAlign='center';fctx.fillText(`${N}×${N} grid | ${N*N} nodos | hamiltoniano`,W2/2,oy+size+20);
+}
+function drawBFSTree(W2,H2){
+  if(S.nodes.length===0){fctx.fillStyle='rgba(0,230,118,0.4)';fctx.font='11px JetBrains Mono';fctx.textAlign='center';fctx.fillText('Añade nodos en modo BUILD primero',W2/2,H2/2);return;}
+  const n=S.nodes.length,adj=S.nodes.map(_=>[]);
+  S.edges.forEach(e=>{adj[e.from].push(e.to);if(!e.directed)adj[e.to].push(e.from);});
+  const parent=new Array(n).fill(-1),dist=new Array(n).fill(-1);
+  const visited=new Set([0]);dist[0]=0;const queue=[0];
+  const treeEdges=[],crossEdges=[];
+  while(queue.length){
+    const v=queue.shift();
+    for(const nb of adj[v]){
+      if(!visited.has(nb)){visited.add(nb);dist[nb]=dist[v]+1;parent[nb]=v;treeEdges.push([v,nb]);queue.push(nb);}
+      else if(parent[v]!==nb) crossEdges.push([v,nb]);
+    }
+  }
+  const maxDist=Math.max(...dist.filter(d=>d>=0),0);
+  const levelNodes=Array.from({length:maxDist+1},()=>[]);
+  dist.forEach((d,i)=>{if(d>=0)levelNodes[d].push(i);});
+  const pos=new Array(n);
+  const margin=30,usable=H2-margin*2;
+  levelNodes.forEach((lvlNs,d)=>{
+    const y=margin+(d/(maxDist||1))*usable;
+    lvlNs.forEach((ni,k)=>pos[ni]=[margin+(k+1)*((W2-margin*2)/(lvlNs.length+1)),y]);
+  });
+  fctx.strokeStyle='rgba(255,82,82,0.3)';fctx.lineWidth=1;fctx.setLineDash([3,3]);
+  crossEdges.forEach(([a,b])=>{if(!pos[a]||!pos[b])return;fctx.beginPath();fctx.moveTo(...pos[a]);fctx.lineTo(...pos[b]);fctx.stroke();});
+  fctx.setLineDash([]);
+  fctx.strokeStyle='rgba(0,229,255,0.7)';fctx.lineWidth=1.5;
+  treeEdges.forEach(([a,b])=>{fctx.beginPath();fctx.moveTo(...pos[a]);fctx.lineTo(...pos[b]);fctx.stroke();});
+  S.nodes.forEach((nd,i)=>{
+    if(!pos[i])return;const[x,y]=pos[i];const isRoot=i===0;
+    fctx.beginPath();fctx.arc(x,y,isRoot?12:9,0,Math.PI*2);
+    fctx.fillStyle=isRoot?'rgba(255,179,0,0.15)':'rgba(0,230,118,0.1)';fctx.fill();
+    fctx.strokeStyle=isRoot?'#ffb300':'rgba(0,230,118,0.6)';fctx.lineWidth=1.5;fctx.stroke();
+    fctx.fillStyle=isRoot?'#ffb300':'#00e676';
+    fctx.font=`${isRoot?11:9}px JetBrains Mono`;fctx.textAlign='center';fctx.textBaseline='middle';
+    fctx.fillText(nd.label,x,y);fctx.textBaseline='alphabetic';
+    fctx.fillStyle='rgba(0,229,255,0.6)';fctx.font='8px JetBrains Mono';fctx.fillText(`d=${dist[i]}`,x,y+20);
+  });
+  fctx.fillStyle='rgba(0,229,255,0.6)';fctx.font='8px JetBrains Mono';fctx.textAlign='left';
+  fctx.fillText('─ aristas árbol BFS',10,H2-28);
+  fctx.fillStyle='rgba(255,82,82,0.5)';fctx.fillText('- - aristas cruzadas (ciclos)',10,H2-16);
+}
+function drawMandelbrot(W2,H2){
+  const maxIter=80,imageData=fctx.createImageData(Math.floor(W2),Math.floor(H2)),data=imageData.data;
+  for(let px=0;px<W2;px++) for(let py=0;py<H2;py++){
+    const cx=-2.5+(px/W2)*3.5,cy=-1.25+(py/H2)*2.5;let zx=0,zy=0,i=0;
+    while(zx*zx+zy*zy<4&&i<maxIter){const tmp=zx*zx-zy*zy+cx;zy=2*zx*zy+cy;zx=tmp;i++;}
+    const idx=4*(py*Math.floor(W2)+px);
+    if(i===maxIter){data[idx]=0;data[idx+1]=10;data[idx+2]=0;data[idx+3]=255;}
+    else{const t=i/maxIter;data[idx]=Math.floor(t*50);data[idx+1]=Math.floor(255*t*(1-t)*4);data[idx+2]=Math.floor(t*40);data[idx+3]=255;}
+  }
+  fctx.putImageData(imageData,0,0);
+  fctx.strokeStyle='rgba(0,230,118,0.2)';fctx.lineWidth=0.5;
+  const ox=W2*2.5/3.5,oy=H2/2;
+  fctx.beginPath();fctx.moveTo(ox,0);fctx.lineTo(ox,H2);fctx.stroke();
+  fctx.beginPath();fctx.moveTo(0,oy);fctx.lineTo(W2,oy);fctx.stroke();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SYSLOG
+// ═══════════════════════════════════════════════════════════════════
+let sysT=null;
+function sysLog(msg){
+  const el=document.getElementById('syslog');
+  el.textContent=msg;el.classList.add('show');
+  if(sysT)clearTimeout(sysT);
+  sysT=setTimeout(()=>el.classList.remove('show'),3500);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HELP
+// ═══════════════════════════════════════════════════════════════════
+function openHelp(){document.getElementById('helpModal').classList.add('show');}
+function closeHelp(){document.getElementById('helpModal').classList.remove('show');}
+
+// ═══════════════════════════════════════════════════════════════════
+// INCIDENCE TOGGLE
+// ═══════════════════════════════════════════════════════════════════
+document.getElementById('matToggle').addEventListener('click',()=>{
+  S.showIncidence=!S.showIncidence;
+  document.getElementById('matToggle').textContent=S.showIncidence?'▾ INCIDENCIA':'▸ INCIDENCIA';
+  document.getElementById('incContent').style.display=S.showIncidence?'block':'none';
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+window.addEventListener('load',()=>{
+  resize();
+  loadLevel(1);
+  startLoop();
+  sysLog('GRAPHLAB v2.5 — ▶ juega | ✦ construye | ◉ analiza | ∿ euler | ⌘ fractal');
+});
+</script>
 </body>
 </html>
