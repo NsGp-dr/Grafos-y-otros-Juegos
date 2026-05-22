@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>EulerTrace — El juego del trazo único</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg:     #0a0c10;
+  --bg2:    #111520;
+  --bg3:    #181d2a;
+  --line:   rgba(255,255,255,0.07);
+  --line2:  rgba(255,255,255,0.14);
+  --ink:    #e8eaf0;
+  --ink2:   #7b8099;
+  --ink3:   #3d4259;
+  --accent: #4fd1c5;   /* teal */
+  --gold:   #f6c94e;
+  --rose:   #f87185;
+  --violet: #a78bfa;
+  --green:  #6ee7b7;
+  --edge-idle:   rgba(99,120,200,0.55);
+  --edge-done:   rgba(79,209,197,0.9);
+  --edge-wrong:  rgba(248,113,133,0.85);
+  --node-idle:   #1e2540;
+  --node-sel:    #4fd1c5;
+  --node-odd:    #f6c94e;
+  --node-even:   #a78bfa;
+  --r: 8px;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Syne', sans-serif;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--sans);touch-action:none}
+
+/* ────────────────────── LAYOUT ────────────────────── */
+#root{display:grid;grid-template-rows:52px 1fr 140px;height:100%;overflow:hidden}
+
+/* ────────────────────── TOP BAR ────────────────────── */
+#bar{display:flex;align-items:center;gap:6px;padding:0 14px;background:var(--bg2);border-bottom:1px solid var(--line);z-index:10}
+#bar .logo{font-size:14px;font-weight:800;letter-spacing:-0.5px;color:var(--accent);white-space:nowrap}
+#bar .dot{width:5px;height:5px;border-radius:50%;background:var(--line2);flex-shrink:0}
+.stat{display:flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11px;color:var(--ink2);white-space:nowrap}
+.stat b{color:var(--ink);font-weight:500}
+#bar .flex{flex:1}
+#btnHelp{background:transparent;border:1px solid var(--line2);color:var(--ink2);font-family:var(--mono);font-size:10px;padding:5px 9px;border-radius:5px;cursor:pointer;letter-spacing:1px}
+
+/* ────────────────────── CANVAS ────────────────────── */
+#cvWrap{position:relative;overflow:hidden;background:var(--bg)}
+canvas#cv{display:block;width:100%;height:100%;cursor:crosshair}
+
+/* ────────────────────── HINT BANNER ────────────────────── */
+#hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(15,18,28,0.9);border:1px solid var(--line2);border-radius:20px;padding:6px 16px;font-family:var(--mono);font-size:11px;color:var(--ink2);pointer-events:none;white-space:nowrap;transition:opacity .3s}
+#hint.hide{opacity:0}
+
+/* score pop */
+.pop{position:absolute;font-family:var(--mono);font-size:16px;font-weight:500;pointer-events:none;animation:popUp 1s ease forwards}
+@keyframes popUp{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-48px);opacity:0}}
+
+/* ────────────────────── BOTTOM PANEL ────────────────────── */
+#bottom{background:var(--bg2);border-top:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;flex-shrink:0;border-bottom:1px solid var(--line)}
+.tab{flex:1;background:none;border:none;padding:9px 4px;font-family:var(--mono);font-size:9px;letter-spacing:1.5px;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;text-transform:uppercase;transition:color .15s}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.pane{display:none;flex:1;overflow-y:auto;overflow-x:hidden}
+.pane.on{display:block}
+
+/* LEVEL pane */
+#pLevel{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.lv-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.lv-card{background:var(--bg3);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;font-size:11px}
+.lv-card .lc-title{font-family:var(--mono);font-size:9px;letter-spacing:1.5px;color:var(--ink3);margin-bottom:4px;text-transform:uppercase}
+.lv-card .lc-val{font-size:14px;font-weight:700;color:var(--accent)}
+.lv-card .lc-sub{font-size:10px;color:var(--ink2);font-family:var(--mono);margin-top:2px}
+.lv-info{background:var(--bg3);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;font-size:11px;line-height:1.65;color:var(--ink2);font-family:var(--mono)}
+.lv-info strong{color:var(--ink)}
+.deg-bar{display:flex;gap:5px;flex-wrap:wrap}
+.deg-chip{font-family:var(--mono);font-size:10px;padding:3px 7px;border-radius:4px;border:1px solid}
+
+/* THEORY pane */
+#pTheory{padding:10px 12px}
+.th-block{background:var(--bg3);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;margin-bottom:7px;font-size:11px;line-height:1.7;color:var(--ink2);font-family:var(--mono)}
+.th-block .th-title{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:5px;font-family:var(--sans)}
+.th-block .formula{display:block;margin:5px 0;color:var(--violet);padding:4px 8px;background:rgba(167,139,250,0.08);border-radius:4px}
+.th-block code{color:var(--gold);background:rgba(246,201,78,0.1);padding:1px 4px;border-radius:3px}
+
+/* ────────────────────── OVERLAY ────────────────────── */
+#overlay{display:none;position:absolute;inset:0;background:rgba(10,12,16,0.92);z-index:40;align-items:center;justify-content:center;padding:16px}
+#overlay.show{display:flex}
+#oCard{background:var(--bg2);border:1px solid var(--line2);border-radius:14px;width:100%;max-width:340px;padding:20px 18px 22px;text-align:center}
+#oCard .oicon{font-size:36px;margin-bottom:10px}
+#oCard h2{font-size:18px;font-weight:800;color:var(--ink);margin-bottom:6px}
+#oCard p{font-size:12px;font-family:var(--mono);color:var(--ink2);line-height:1.7;margin-bottom:14px}
+#oCard .obig{font-size:26px;font-weight:800;color:var(--gold);margin:6px 0}
+.obtn{display:block;width:100%;margin-top:8px;padding:11px;border-radius:var(--r);font-family:var(--mono);font-size:12px;cursor:pointer;letter-spacing:1px;border:1px solid}
+.obtn.primary{background:rgba(79,209,197,0.12);border-color:var(--accent);color:var(--accent)}
+.obtn.secondary{background:transparent;border-color:var(--line2);color:var(--ink2)}
+.obtn:active{transform:scale(0.98)}
+
+/* HELP modal */
+#helpModal{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;padding:12px}
+#helpModal.show{display:flex}
+#hBox{background:var(--bg2);border:1px solid var(--line2);border-radius:14px;width:100%;max-width:340px;max-height:86vh;overflow-y:auto}
+#hBox h2{padding:14px 16px 10px;font-size:15px;font-weight:800;color:var(--accent);border-bottom:1px solid var(--line)}
+.hSection{padding:12px 16px;border-bottom:1px solid var(--line);font-size:11px;font-family:var(--mono);line-height:1.75;color:var(--ink2)}
+.hSection h3{font-size:11px;font-weight:500;color:var(--violet);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;font-family:var(--mono)}
+.hSection strong,.hSection b{color:var(--ink)}
+.hl{background:rgba(79,209,197,0.08);border-left:2px solid var(--accent);padding:6px 10px;border-radius:0 4px 4px 0;margin:6px 0;color:var(--accent)}
+#btnCloseHelp{display:block;width:calc(100% - 32px);margin:12px 16px;padding:10px;background:transparent;border:1px solid var(--line2);border-radius:var(--r);color:var(--ink2);font-family:var(--mono);font-size:11px;cursor:pointer}
+
+/* scrollbar */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:2px}
+</style>
+</head>
+<body>
+<div id="root">
+
+  <!-- TOP BAR -->
+  <div id="bar">
+    <span class="logo">◈ EULER·TRAZO</span>
+    <div class="dot"></div>
+    <div class="stat">N<b id="hLvl">1</b></div>
+    <div class="stat">★<b id="hPts">0</b></div>
+    <div class="stat">×<b id="hCombo">1</b></div>
+    <div class="flex"></div>
+    <button id="btnHelp" onclick="openHelp()">? AYUDA</button>
+  </div>
+
+  <!-- GRAPH CANVAS -->
+  <div id="cvWrap">
+    <canvas id="cv"></canvas>
+    <div id="hint">Toca un nodo para empezar</div>
+    <!-- overlays injected here -->
+  </div>
+
+  <!-- BOTTOM PANEL -->
+  <div id="bottom">
+    <div class="tabs">
+      <button class="tab on" data-tab="level" onclick="swTab(this)">NIVEL</button>
+      <button class="tab" data-tab="theory" onclick="swTab(this)">TEORÍA</button>
+    </div>
+    <div class="pane on" id="pLevel"></div>
+    <div class="pane" id="pTheory"></div>
+  </div>
+</div>
+
+<!-- WIN / FAIL OVERLAY -->
+<div id="overlay">
+  <div id="oCard">
+    <div class="oicon" id="oIcon"></div>
+    <h2 id="oTitle"></h2>
+    <p id="oMsg"></p>
+    <div class="obig" id="oPts"></div>
+    <button class="obtn primary" id="oBtnMain" onclick="overlayMain()"></button>
+    <button class="obtn secondary" onclick="resetLevel()">Reintentar</button>
+  </div>
+</div>
+
+<!-- HELP MODAL -->
+<div id="helpModal">
+  <div id="hBox">
+    <h2>◈ Cómo jugar</h2>
+    <div class="hSection">
+      <h3>El objetivo</h3>
+      Traza <strong>todas las aristas</strong> del grafo con un solo dedo, <strong>sin levantar</strong> y <strong>sin repetir</strong> ninguna arista. Es el problema de Euler de 1736 convertido en juego.
+    </div>
+    <div class="hSection">
+      <h3>Controles</h3>
+      <ul style="padding-left:14px">
+        <li><b>Toca un nodo</b> para empezar o continuar desde él.</li>
+        <li><b>Desliza hasta otro nodo</b> conectado para trazar la arista.</li>
+        <li>Las aristas ya trazadas se bloquean — no puedes repetirlas.</li>
+        <li><b>Toca "Reintentar"</b> si te atascas.</li>
+      </ul>
+    </div>
+    <div class="hSection">
+      <h3>Clave para ganar</h3>
+      <div class="hl">Un grafo tiene camino euleriano ↔ tiene exactamente 0 ó 2 nodos de grado impar.</div>
+      <b>Nodo amarillo</b> = grado impar → es donde debes empezar o terminar.<br>
+      <b>Nodo violeta</b> = grado par → puedes pasar por él sin problemas.
+    </div>
+    <div class="hSection">
+      <h3>Puntos</h3>
+      Cada arista: <b style="color:var(--gold)">+10 × combo</b>. Combo sube con aristas consecutivas. Nivel completo: <b style="color:var(--gold)">+500 bonus</b>. Callejón sin salida: combo se resetea.
+    </div>
+    <div class="hSection">
+      <h3>Niveles</h3>
+      <b>1-2</b> Grafos simples (4-5 nodos).<br>
+      <b>3-4</b> Multigrafos (aristas paralelas).<br>
+      <b>5</b> ¡Los 7 puentes de Königsberg! (imposible — descúbrelo tú mismo).<br>
+      <b>6-7</b> Pseudografos con bucles.<br>
+      <b>8</b> Desafío final.
+    </div>
+    <button id="btnCloseHelp" onclick="closeHelp()">Cerrar</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+const G = {
+  lvl: 1, pts: 0, combo: 1,
+  started: false,        // has user placed first node?
+  curNode: -1,           // current node index
+  usedEdges: new Set(),  // indices of drawn edges
+  path: [],              // sequence of node indices
+  dead: false,           // stuck?
+  won: false,
+};
+
+// ═══════════════════════════════════════════════════════
+// LEVEL DEFINITIONS
+// ═══════════════════════════════════════════════════════
+// type: 'undirected' or 'directed' (directed = arrows, no Euler path goal)
+// Each edge: {a, b, label?}
+// Euler goal: traverse all edges exactly once
+// special: 'impossible' = Königsberg-style lesson
+
+const LEVELS = [
+{
+  id:1, name:'Primer trazo',
+  desc:'Grafo simple con 4 nodos. Todos los grados son pares → existe un <strong>circuito euleriano</strong>: empieza y termina en el mismo nodo.',
+  nodes:['A','B','C','D'],
+  edges:[{a:0,b:1},{a:1,b:2},{a:2,b:3},{a:3,b:0},{a:0,b:2}],
+  type:'undirected',
+  fact:'Con todos los grados pares, puedes empezar desde cualquier nodo y regresar al inicio.'
+},{
+  id:2, name:'Camino, no circuito',
+  desc:'Tiene exactamente <strong>2 nodos de grado impar</strong> (marcados en amarillo). El camino euleriano existe, pero debes empezar y terminar en ellos.',
+  nodes:['P','Q','R','S','T'],
+  edges:[{a:0,b:1},{a:1,b:2},{a:2,b:3},{a:3,b:4},{a:0,b:2},{a:1,b:3}],
+  type:'undirected',
+  fact:'Exactamente 2 nodos impares → camino euleriano. Empieza en uno, termina en el otro.'
+},{
+  id:3, name:'Multigrafo I',
+  desc:'Aristas paralelas entre el mismo par de nodos. El grafo sigue siendo euleriano: ¿ves por qué?',
+  nodes:['X','Y','Z','W'],
+  edges:[{a:0,b:1},{a:0,b:1},{a:1,b:2},{a:2,b:3},{a:3,b:0},{a:1,b:3}],
+  type:'undirected',
+  fact:'Las aristas paralelas se cuentan individualmente. Suma los grados correctamente.'
+},{
+  id:4, name:'Multigrafo II',
+  desc:'Un multigrafo más denso. Calcula los grados antes de empezar para decidir el nodo inicial.',
+  nodes:['1','2','3','4','5'],
+  edges:[{a:0,b:1},{a:1,b:2},{a:2,b:0},{a:2,b:3},{a:3,b:4},{a:4,b:2},{a:0,b:3},{a:1,b:4}],
+  type:'undirected',
+  fact:'Si calculas los grados primero, sabrás si hay 0 ó 2 nodos impares antes de mover un dedo.'
+},{
+  id:5, name:'¡Los 7 puentes!',
+  desc:'El grafo original de Königsberg (1736). Euler demostró que es <strong>imposible</strong>: hay 4 nodos de grado impar. Inténtalo y descubre el callejón por ti mismo.',
+  nodes:['Norte','Sur','Este','Isla'],
+  edges:[{a:0,b:3,label:'p1'},{a:0,b:3,label:'p2'},{a:1,b:3,label:'p3'},{a:1,b:3,label:'p4'},{a:2,b:3,label:'p5'},{a:0,b:1,label:'p6'},{a:0,b:2,label:'p7'}],
+  type:'undirected',
+  special:'impossible',
+  fact:'4 nodos de grado impar → IMPOSIBLE. Euler demostró esto en 1736, inventando la teoría de grafos.'
+},{
+  id:6, name:'Pseudografo',
+  desc:'Con <strong>bucles</strong> (aristas que van de un nodo a sí mismo). Un bucle contribuye +2 al grado → siempre mantiene la paridad. ¿El grafo sigue siendo euleriano?',
+  nodes:['α','β','γ'],
+  edges:[{a:0,b:0,label:'bucle'},{a:0,b:1},{a:1,b:2},{a:2,b:0},{a:1,b:2}],
+  type:'undirected',
+  fact:'Un bucle en v suma 2 a su grado (ambos extremos son v). La paridad no cambia.'
+},{
+  id:7, name:'Grafo completo K₄',
+  desc:'El grafo completo de 4 nodos: cada par está conectado. Cada nodo tiene grado 3 (impar). Hay exactamente 4 nodos impares → imposible. ¡Compruébalo!',
+  nodes:['A','B','C','D'],
+  edges:[{a:0,b:1},{a:0,b:2},{a:0,b:3},{a:1,b:2},{a:1,b:3},{a:2,b:3}],
+  type:'undirected',
+  special:'impossible',
+  fact:'K₄ tiene 4 nodos de grado 3 (impar) → no existe camino euleriano.'
+},{
+  id:8, name:'Desafío final',
+  desc:'El grafo más complejo. Identifica los nodos impares, planea tu ruta, y ejecuta el trazo perfecto. Bonus máximo si no te equivocas.',
+  nodes:['A','B','C','D','E','F'],
+  edges:[{a:0,b:1},{a:1,b:2},{a:2,b:3},{a:3,b:4},{a:4,b:5},{a:5,b:0},{a:0,b:3},{a:1,b:4},{a:2,b:5}],
+  type:'undirected',
+  fact:'Todos los grados son pares en este grafo → circuito euleriano. Buen suerte.'
+}
+];
+
+// ═══════════════════════════════════════════════════════
+// CANVAS
+// ═══════════════════════════════════════════════════════
+const canvas = document.getElementById('cv');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('cvWrap');
+let W, H, nodePos = [], animT = 0, raf = null;
+let dragFrom = -1; // for touch drag tracking
+
+function resize() {
+  W = wrap.clientWidth; H = wrap.clientHeight;
+  canvas.width = W * devicePixelRatio;
+  canvas.height = H * devicePixelRatio;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  layout();
+  render();
+}
+
+function layout() {
+  const lvl = cur();
+  const n = lvl.nodes.length;
+  const cx = W/2, cy = H/2;
+  const r = Math.min(W, H) * 0.34;
+
+  if (G.lvl === 5) {
+    // Königsberg special layout
+    nodePos = [
+      [cx, cy - r*0.85],       // Nord
+      [cx, cy + r*0.85],       // Sur
+      [cx + r*0.95, cy],       // Este
+      [cx - r*0.1, cy],        // Isla
+    ];
+    return;
+  }
+  if (n === 6) {
+    nodePos = [];
+    for (let i=0;i<6;i++) {
+      const a = (Math.PI*2*i/6) - Math.PI/2;
+      nodePos.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]);
+    }
+    return;
+  }
+  nodePos = [];
+  for (let i=0;i<n;i++) {
+    const a = (Math.PI*2*i/n) - Math.PI/2;
+    nodePos.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]);
+  }
+}
+
+// ─── DEGREES ────
+function getDeg(lvl) {
+  const n = lvl.nodes.length;
+  const deg = new Array(n).fill(0);
+  lvl.edges.forEach(e => {
+    if (e.a === e.b) { deg[e.a] += 2; }
+    else { deg[e.a]++; deg[e.b]++; }
+  });
+  return deg;
+}
+
+function getOdd(lvl) {
+  return getDeg(lvl).map((d,i)=>({i,d,odd:d%2===1})).filter(x=>x.odd).map(x=>x.i);
+}
+
+// ─── DRAW ────
+function cur() { return LEVELS[G.lvl-1]; }
+
+function render() {
+  ctx.clearRect(0,0,W,H);
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,0.03)';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=44){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=0;y<H;y+=44){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+
+  const lvl = cur();
+  const deg = getDeg(lvl);
+  const odd = getOdd(lvl);
+  const isDir = lvl.type === 'directed';
+
+  // Count parallel edges for offset
+  const edgePairs = {};
+  lvl.edges.forEach((e,i)=>{
+    const k=`${Math.min(e.a,e.b)}_${Math.max(e.a,e.b)}`;
+    if(!edgePairs[k]) edgePairs[k]=[];
+    edgePairs[k].push(i);
+  });
+  const edgePlaced = {};
+
+  // Draw edges
+  lvl.edges.forEach((e,i)=>{
+    const k=`${Math.min(e.a,e.b)}_${Math.max(e.a,e.b)}`;
+    if(!edgePlaced[k]) edgePlaced[k]=0;
+    const myIdx = edgePlaced[k];
+    edgePlaced[k]++;
+    const total = edgePairs[k].length;
+
+    const isLoop = e.a === e.b;
+    const done = G.usedEdges.has(i);
+    const [x1,y1]=nodePos[e.a], [x2,y2]=nodePos[e.b];
+
+    ctx.save();
+    if (done) {
+      ctx.strokeStyle = 'var(--edge-done)';
+      ctx.lineWidth = 4;
+    } else {
+      ctx.strokeStyle = 'var(--edge-idle)';
+      ctx.lineWidth = 2.5;
+    }
+
+    if (isLoop) {
+      // Draw loop above node
+      const loopR = 20;
+      ctx.beginPath();
+      ctx.arc(x1, y1-loopR-12, loopR, 0, Math.PI*2);
+      ctx.stroke();
+    } else {
+      const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy);
+      const nx=-dy/len, ny=dx/len;
+      const off = total>1 ? (myIdx-(total-1)/2)*16 : 0;
+      const mx=(x1+x2)/2+nx*off, my=(y1+y2)/2+ny*off;
+
+      if(total>1||off!==0){
+        ctx.beginPath();ctx.moveTo(x1,y1);
+        ctx.quadraticCurveTo(mx,my,x2,y2);
+        ctx.stroke();
+        // label
+        if(e.label && !done){
+          ctx.fillStyle='rgba(99,120,200,0.8)';
+          ctx.font='9px JetBrains Mono,monospace';ctx.textAlign='center';
+          ctx.fillText(e.label,mx+nx*10,my+ny*10);
+        }
+      } else {
+        ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+        if(e.label && !done){
+          ctx.fillStyle='rgba(99,120,200,0.8)';
+          ctx.font='9px JetBrains Mono,monospace';ctx.textAlign='center';
+          const lx=(x1+x2)/2+nx*12,ly=(y1+y2)/2+ny*12;
+          ctx.fillText(e.label,lx,ly);
+        }
+      }
+
+      // tick mark for done edges
+      if(done){
+        const tx=(x1+x2)/2+nx*off, ty=(y1+y2)/2+ny*off;
+        ctx.fillStyle='var(--edge-done)';
+        ctx.beginPath();ctx.arc(tx,ty,4,0,Math.PI*2);ctx.fill();
+      }
+    }
+    ctx.restore();
+  });
+
+  // Draw nodes
+  lvl.nodes.forEach((label,i)=>{
+    const [x,y]=nodePos[i];
+    const isSel = G.curNode===i;
+    const isOdd = deg[i]%2===1;
+    const pct = (animT+i*0.7)%(Math.PI*2);
+    const pulse = 0.5+0.5*Math.sin(pct);
+
+    // Glow for selected
+    if(isSel){
+      ctx.beginPath();ctx.arc(x,y,26+4*pulse,0,Math.PI*2);
+      ctx.fillStyle=`rgba(79,209,197,${0.1+0.08*pulse})`;ctx.fill();
+    }
+
+    // Node circle
+    ctx.beginPath();ctx.arc(x,y,20,0,Math.PI*2);
+    if(isSel){ctx.fillStyle='rgba(79,209,197,0.18)'}
+    else{ctx.fillStyle=isOdd?'rgba(246,201,78,0.08)':'rgba(167,139,250,0.08)'}
+    ctx.fill();
+    ctx.strokeStyle=isSel?'var(--node-sel)':isOdd?'var(--node-odd)':'var(--node-even)';
+    ctx.lineWidth=isSel?2.5:1.5;
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle=isSel?'var(--accent)':isOdd?'var(--gold)':'var(--violet)';
+    ctx.font=`500 12px 'Syne',sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(label,x,y);
+    ctx.textBaseline='alphabetic';
+
+    // Degree badge
+    ctx.font=`10px JetBrains Mono,monospace`;
+    ctx.fillStyle=isOdd?'rgba(246,201,78,0.7)':'rgba(167,139,250,0.55)';
+    ctx.textAlign='center';
+    ctx.fillText(`d=${deg[i]}`,x,y+34);
+  });
+}
+
+function startLoop(){
+  if(raf) return;
+  function loop(){animT+=0.025;render();raf=requestAnimationFrame(loop)}
+  loop();
+}
+
+// ─── INTERACTION ────
+function nodeAt(mx,my){
+  for(let i=0;i<nodePos.length;i++){
+    const[x,y]=nodePos[i];
+    if(Math.hypot(mx-x,my-y)<30) return i;
+  }
+  return -1;
+}
+
+function getEdgeBetween(a,b){
+  const lvl=cur();
+  for(let i=0;i<lvl.edges.length;i++){
+    const e=lvl.edges[i];
+    const match = (e.a===a&&e.b===b)||(e.a===b&&e.b===a);
+    if(match&&!G.usedEdges.has(i)) return i;
+  }
+  return -1;
+}
+
+function getLoopEdge(a){
+  const lvl=cur();
+  for(let i=0;i<lvl.edges.length;i++){
+    const e=lvl.edges[i];
+    if(e.a===a&&e.b===a&&!G.usedEdges.has(i)) return i;
+  }
+  return -1;
+}
+
+function canReach(node, from){
+  // Are there any unused edges from this node?
+  const lvl=cur();
+  return lvl.edges.some((e,i)=>!G.usedEdges.has(i)&&(e.a===node||e.b===node));
+}
+
+function handleTap(mx,my){
+  const ni=nodeAt(mx,my);
+  if(ni<0) return;
+
+  if(!G.started){
+    G.started=true;
+    G.curNode=ni;
+    G.path=[ni];
+    setHint(`En ${cur().nodes[ni]} — desliza a un vecino`);
+    return;
+  }
+
+  if(ni===G.curNode){
+    // Try loop
+    const loopE=getLoopEdge(ni);
+    if(loopE>=0){
+      G.usedEdges.add(loopE);
+      G.combo++;
+      G.pts+=10*G.combo;
+      G.path.push(ni);
+      pop(`+${10*G.combo}`,nodePos[ni][0],nodePos[ni][1]-30);
+      updateHUD();
+      checkWin();
+    }
+    return;
+  }
+
+  // Move to ni
+  const ei=getEdgeBetween(G.curNode,ni);
+  if(ei<0){
+    // Can't go there
+    G.combo=Math.max(1,G.combo-1);
+    setHint(`No hay arista libre de ${cur().nodes[G.curNode]} a ${cur().nodes[ni]}`);
+    updateHUD();
+    return;
+  }
+
+  G.usedEdges.add(ei);
+  G.combo = Math.min(G.combo+1,8);
+  G.pts += 10*G.combo;
+  G.path.push(ni);
+  G.curNode=ni;
+  pop(`+${10*G.combo}`,nodePos[ni][0],nodePos[ni][1]-30);
+  updateHUD();
+
+  const lvl=cur();
+  const remaining = lvl.edges.length-G.usedEdges.size;
+  if(remaining===0){
+    checkWin();
+  } else {
+    // Check if stuck
+    const hasMove=lvl.edges.some((e,i)=>!G.usedEdges.has(i)&&(e.a===G.curNode||e.b===G.curNode));
+    if(!hasMove && remaining>0){
+      G.dead=true;
+      const sp = lvl.special==='impossible';
+      if(sp){
+        showOverlay('impossible');
+      } else {
+        setHint(`Atascado en ${lvl.nodes[G.curNode]} con ${remaining} aristas sin trazar`);
+        showOverlay('stuck');
+      }
+    } else {
+      setHint(`${remaining} arista${remaining!==1?'s':''} por trazar`);
+    }
+  }
+}
+
+function checkWin(){
+  const lvl=cur();
+  if(G.usedEdges.size===lvl.edges.length){
+    G.won=true;
+    G.pts+=500;
+    updateHUD();
+    showOverlay('win');
+  }
+}
+
+// Touch / Mouse
+canvas.addEventListener('touchstart', e=>{
+  e.preventDefault();
+  const t=e.changedTouches[0];
+  const r=canvas.getBoundingClientRect();
+  const mx=t.clientX-r.left, my=t.clientY-r.top;
+  dragFrom=nodeAt(mx,my);
+  if(!G.started) handleTap(mx,my);
+},{passive:false});
+
+canvas.addEventListener('touchend', e=>{
+  e.preventDefault();
+  const t=e.changedTouches[0];
+  const r=canvas.getBoundingClientRect();
+  const mx=t.clientX-r.left, my=t.clientY-r.top;
+  const ni=nodeAt(mx,my);
+  if(G.started && ni>=0 && ni!==dragFrom){
+    handleTap(mx,my);
+  } else if(!G.started){
+    handleTap(mx,my);
+  } else if(ni>=0){
+    handleTap(mx,my);
+  }
+  dragFrom=-1;
+},{passive:false});
+
+canvas.addEventListener('click', e=>{
+  const r=canvas.getBoundingClientRect();
+  handleTap(e.clientX-r.left, e.clientY-r.top);
+});
+
+// ═══════════════════════════════════════════════════════
+// OVERLAY
+// ═══════════════════════════════════════════════════════
+function showOverlay(type){
+  const lvl=cur();
+  const el=document.getElementById('overlay');
+  const isImpossible=lvl.special==='impossible';
+  el.classList.add('show');
+
+  if(type==='win'){
+    document.getElementById('oIcon').textContent='🏆';
+    document.getElementById('oTitle').textContent='¡Trazo perfecto!';
+    document.getElementById('oMsg').textContent=lvl.fact;
+    document.getElementById('oPts').textContent=`+${G.pts} pts`;
+    const btn=document.getElementById('oBtnMain');
+    btn.textContent = G.lvl<LEVELS.length ? 'Siguiente nivel →' : '¡Completado!';
+  } else if(type==='stuck'){
+    document.getElementById('oIcon').textContent='🚧';
+    document.getElementById('oTitle').textContent='Camino sin salida';
+    document.getElementById('oMsg').textContent=`Te atascaste con ${lvl.edges.length-G.usedEdges.size} arista(s) sin trazar. Pista: ${lvl.fact}`;
+    document.getElementById('oPts').textContent='';
+    document.getElementById('oBtnMain').textContent='Ver teoría';
+  } else if(type==='impossible'){
+    document.getElementById('oIcon').textContent='🔴';
+    document.getElementById('oTitle').textContent='¡Imposible! Euler tenía razón';
+    document.getElementById('oMsg').textContent=`Este grafo tiene ${getOdd(lvl).length} nodos de grado impar. Euler demostró en 1736 que necesitas 0 ó 2. ${lvl.fact}`;
+    document.getElementById('oPts').textContent=`+200 pts por intentarlo`;
+    G.pts+=200;updateHUD();
+    document.getElementById('oBtnMain').textContent='Entendido, siguiente →';
+  }
+}
+
+function overlayMain(){
+  document.getElementById('overlay').classList.remove('show');
+  const lvl=cur();
+  if(G.won||(lvl.special==='impossible')){
+    if(G.lvl<LEVELS.length){ G.lvl++; initLevel(); }
+    else { document.getElementById('oIcon').textContent='🎓'; document.getElementById('oTitle').textContent='¡Juego completado!'; document.getElementById('oMsg').textContent='Has aprendido la teoría de Euler. Muestra tu puntuación a tu docente.'; document.getElementById('oPts').textContent=G.pts+' pts'; document.getElementById('oBtnMain').style.display='none'; document.getElementById('overlay').classList.add('show'); }
+  } else {
+    swTab(document.querySelector('[data-tab="theory"]'));
+  }
+}
+
+function resetLevel(){
+  document.getElementById('overlay').classList.remove('show');
+  G.usedEdges.clear();
+  G.started=false;
+  G.curNode=-1;
+  G.path=[];
+  G.dead=false;
+  G.won=false;
+  G.combo=1;
+  updateHUD();
+  setHint('Toca un nodo para empezar');
+  updateLevelPanel();
+}
+
+// ═══════════════════════════════════════════════════════
+// HUD / PANELS
+// ═══════════════════════════════════════════════════════
+function updateHUD(){
+  document.getElementById('hLvl').textContent=G.lvl;
+  document.getElementById('hPts').textContent=G.pts;
+  document.getElementById('hCombo').textContent=G.combo;
+}
+
+function setHint(txt){
+  const h=document.getElementById('hint');
+  h.textContent=txt;
+  h.classList.remove('hide');
+}
+
+function pop(txt,x,y){
+  const d=document.createElement('div');
+  d.className='pop';d.textContent=txt;
+  d.style.cssText=`left:${x}px;top:${y}px;color:var(--gold);transform-origin:center;`;
+  wrap.appendChild(d);
+  setTimeout(()=>d.remove(),1000);
+}
+
+function updateLevelPanel(){
+  const lvl=cur();
+  const deg=getDeg(lvl);
+  const odd=getOdd(lvl);
+  const isImpossible=lvl.special==='impossible';
+  const remaining=lvl.edges.length-G.usedEdges.size;
+
+  let degChips=deg.map((d,i)=>{
+    const isOdd=d%2===1;
+    const color=isOdd?'var(--gold)':'var(--violet)';
+    const bg=isOdd?'rgba(246,201,78,0.1)':'rgba(167,139,250,0.1)';
+    return `<span class="deg-chip" style="color:${color};border-color:${color};background:${bg}">${lvl.nodes[i]}:${d}</span>`;
+  }).join('');
+
+  const euler = odd.length===0
+    ? '<span style="color:var(--green)">✓ Circuito euleriano</span>'
+    : odd.length===2
+    ? '<span style="color:var(--gold)">≈ Camino euleriano</span>'
+    : `<span style="color:var(--rose)">✗ Imposible (${odd.length} nodos impares)</span>`;
+
+  document.getElementById('pLevel').innerHTML=`
+<div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+  <div class="lv-row">
+    <div class="lv-card"><div class="lc-title">Nivel</div><div class="lc-val">${G.lvl}/8</div><div class="lc-sub">${lvl.name}</div></div>
+    <div class="lv-card"><div class="lc-title">Aristas</div><div class="lc-val">${G.usedEdges.size}/${lvl.edges.length}</div><div class="lc-sub">${remaining} pendientes</div></div>
+  </div>
+  <div class="lv-card" style="grid-column:span 2">
+    <div class="lc-title">Estado euleriano</div>
+    <div style="font-size:12px;margin-top:4px">${euler}</div>
+  </div>
+  <div class="lv-info">${lvl.desc}</div>
+  <div class="lv-card">
+    <div class="lc-title">Grados de nodos</div>
+    <div class="deg-bar" style="margin-top:6px">${degChips}</div>
+  </div>
+</div>`;
+}
+
+function updateTheoryPanel(){
+  document.getElementById('pTheory').innerHTML=`
+<div id="pTheory-inner" style="padding:10px 12px">
+  <div class="th-block">
+    <div class="th-title">¿Qué es un camino euleriano?</div>
+    Un camino que recorre <strong>cada arista exactamente una vez</strong>. No importa si visitas el mismo nodo varias veces — lo que no puedes repetir es la arista.
+    <span class="formula">Euler (1736): primera prueba en teoría de grafos</span>
+  </div>
+  <div class="th-block">
+    <div class="th-title">Criterio de Euler</div>
+    Un grafo conexo tiene camino euleriano si y solo si:
+    <ul style="padding-left:14px;margin-top:6px;line-height:2">
+      <li><strong>0 nodos de grado impar</strong> → circuito euleriano (inicio = fin)</li>
+      <li><strong>2 nodos de grado impar</strong> → camino euleriano (empieza y termina en ellos)</li>
+      <li><strong>4+ nodos impares</strong> → imposible</li>
+    </ul>
+    <span class="formula">Σ deg(v) = 2|E| → siempre hay un número par de nodos impares</span>
+  </div>
+  <div class="th-block">
+    <div class="th-title">Grado de un nodo</div>
+    El grado <code>deg(v)</code> es el número de aristas incidentes a v.<br>
+    <strong>Bucle:</strong> cuenta como 2 (toca v en ambos extremos).<br>
+    <strong>Aristas paralelas:</strong> cada una se cuenta separada.
+    <span class="formula">Σ deg(v) = 2 × (número de aristas)</span>
+  </div>
+  <div class="th-block">
+    <div class="th-title">Tipos de grafos</div>
+    <strong>Grafo simple:</strong> sin bucles ni aristas paralelas.<br>
+    <strong>Multigrafo:</strong> permite aristas paralelas. <code>A[i][j] > 1</code><br>
+    <strong>Pseudografo:</strong> multigrafo + bucles permitidos.<br>
+    En todos aplica el mismo criterio euleriano.
+  </div>
+  <div class="th-block">
+    <div class="th-title">Los 7 puentes de Königsberg</div>
+    El problema de 1736: ¿puedes cruzar los 7 puentes sin repetir? Los 4 nodos (orillas e isla) tienen grados <strong>3, 3, 3, 5</strong> — todos impares. Con 4 nodos impares, es imposible. Euler probó esto, inventando la teoría de grafos.
+  </div>
+  <div class="th-block">
+    <div class="th-title">Metacognición: planifica antes de trazar</div>
+    1. Cuenta los grados de todos los nodos.<br>
+    2. Si hay 0 nodos impares → empieza en cualquiera.<br>
+    3. Si hay 2 nodos impares → <strong>debes</strong> empezar en uno de ellos.<br>
+    4. Si hay 4+ nodos impares → ni lo intentes, es imposible.<br>
+    <span style="color:var(--accent)">Esta verificación previa es pensar en grafos como Euler.</span>
+  </div>
+</div>`;
+}
+
+function swTab(btn,doScroll=true){
+  if(typeof btn==='string') btn=document.querySelector(`[data-tab="${btn}"]`);
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on');
+  const pane=document.getElementById('p'+btn.dataset.tab.charAt(0).toUpperCase()+btn.dataset.tab.slice(1));
+  if(pane) pane.classList.add('on');
+}
+
+function initLevel(){
+  G.usedEdges.clear();
+  G.started=false;
+  G.curNode=-1;
+  G.path=[];
+  G.dead=false;
+  G.won=false;
+  G.combo=1;
+  layout();
+  updateHUD();
+  updateLevelPanel();
+  updateTheoryPanel();
+  setHint('Toca un nodo para empezar');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+function openHelp(){ document.getElementById('helpModal').classList.add('show'); }
+function closeHelp(){ document.getElementById('helpModal').classList.remove('show'); }
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+window.addEventListener('resize', resize);
+resize();
+initLevel();
+startLoop();
+</script>
+</body>
+</html>

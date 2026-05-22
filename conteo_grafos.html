@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, touch-action: manipulation">
+  <title>NetHack: Pathfinder | V0.1.0</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0c0f;
+      display: flex; flex-direction: column; align-items: center;
+      font-family: 'Share Tech Mono', monospace;
+      height: 100vh; overflow: hidden;
+      user-select: none; touch-action: none;
+    }
+    #game-canvas {
+      display: block; width: 100%; height: auto;
+      box-shadow: 0 0 30px rgba(0, 255, 65, 0.2);
+      touch-action: none;
+    }
+    
+    /* HUD de Hacker */
+    #hud {
+      position: fixed; top: 10px; left: 10px; right: 10px;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 16px; z-index: 20;
+      background: rgba(10, 12, 15, 0.8);
+      backdrop-filter: blur(10px);
+      border: 1px solid #00ff4133;
+      border-radius: 8px;
+      color: #00ff41; font-size: 0.9rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+    }
+    .hud-item { display: flex; align-items: center; gap: 8px; }
+    .hud-label { color: #008f11; text-transform: uppercase; }
+    
+    /* Visor de Matriz (parte del HUD) */
+    #matrix-hud {
+      position: fixed; top: 70px; right: 10px; width: 150px;
+      background: rgba(10, 15, 10, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid #00ff41; border-radius: 8px;
+      padding: 8px; color: #00ff41; font-size: 0.7rem;
+      display: none; z-index: 20;
+    }
+    
+    /* Terminal de Log (tarjeta tutorial) */
+    #sys-log {
+      position: fixed; bottom: 90px; left: 15px; right: 15px;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(15px);
+      border: 1px solid #00ff41; border-radius: 8px;
+      padding: 12px; color: #b5ffb5; font-size: 0.8rem;
+      z-index: 30; display: none;
+    }
+    #sys-log .prompt { color: #00ff41; }
+    
+    /* Barra de Herramientas */
+    #toolbar {
+      position: fixed; bottom: 15px; left: 15px; right: 15px;
+      background: rgba(10, 12, 15, 0.9);
+      backdrop-filter: blur(12px);
+      border: 1px solid #00ff4133; border-radius: 30px;
+      padding: 10px 15px; display: flex; justify-content: space-around;
+      z-index: 25;
+    }
+    .cyber-btn {
+      background: transparent; border: 1px solid #00ff41; color: #00ff41;
+      font-family: 'Share Tech Mono', monospace; font-size: 0.8rem;
+      padding: 8px 16px; border-radius: 20px; cursor: pointer;
+      transition: 0.2s; text-transform: uppercase;
+    }
+    .cyber-btn.active { background: #00ff41; color: #0a0c0f; box-shadow: 0 0 15px #00ff41; }
+    
+    /* Efectos Glitch */
+    @keyframes glitch {
+      0% { transform: translate(0); }
+      20% { transform: translate(-1px, 1px); }
+      40% { transform: translate(-1px, -1px); }
+      60% { transform: translate(1px, 1px); }
+      80% { transform: translate(1px, -1px); }
+      100% { transform: translate(0); }
+    }
+    .glitch { animation: glitch 0.3s infinite; }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-item"><span class="hud-label">RANGO:</span><span id="hud-rank">SCRIPT_KIDDIE</span></div>
+    <div class="hud-item"><span class="hud-label">PI:</span><span id="hud-score">0000</span></div>
+    <div class="hud-item"><span class="hud-label">NIVEL:</span><span id="hud-level">01</span></div>
+  </div>
+
+  <!-- Visor de Matriz -->
+  <div id="matrix-hud"></div>
+
+  <!-- Terminal de Log -->
+  <div id="sys-log">
+    <span class="prompt">></span> <span id="log-text"></span>
+  </div>
+
+  <!-- Barra de Herramientas -->
+  <div id="toolbar">
+    <button class="cyber-btn active" id="btn-play">▶ PLAY</button>
+    <button class="cyber-btn" id="btn-build">⌨ BUILD</button>
+    <button class="cyber-btn" id="btn-analyze">◉ ANALYZE</button>
+    <button class="cyber-btn" id="btn-fractal">⌘ FRACTAL</button>
+  </div>
+
+  <script>
+    (function() {
+      const canvas = document.getElementById('game-canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // --- AJUSTE DE LIENZO ---
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+
+      // --- ESTADO GLOBAL DEL JUEGO ---
+      const GameState = {
+        mode: 'play', // 'play', 'build', 'analyze', 'fractal'
+        rank: 'SCRIPT_KIDDIE',
+        score: 0,
+        level: 1,
+        nodes: [],
+        edges: [],
+        selectedNode: null,
+        visitedNodes: new Set(),
+        path: [],
+        isAnimating: false,
+      };
+
+      // --- NODOS Y ARISTAS ---
+      class Node {
+        constructor(id, x, y, z = 0) {
+          this.id = id;
+          this.x = x; this.y = y; this.z = z;
+          this.radius = 15;
+          this.visited = false;
+        }
+      }
+
+      class Edge {
+        constructor(from, to, type = 'directed') {
+          this.from = from;
+          this.to = to;
+          this.type = type;
+        }
+      }
+
+      // --- GENERADOR DE NIVELES SIMPLE ---
+      function generateLevel(level) {
+        const nodes = [];
+        const edges = [];
+        const count = 4 + level;
+        for (let i = 0; i < count; i++) {
+          const angle = (i / count) * Math.PI * 2;
+          const radius = 120;
+          nodes.push(new Node(i, canvas.width/2 + Math.cos(angle)*radius, canvas.height/2 + Math.sin(angle)*radius, 0));
+        }
+        // Conectar en anillo
+        for (let i = 0; i < count; i++) {
+          edges.push(new Edge(i, (i+1)%count, 'directed'));
+        }
+        return { nodes, edges };
+      }
+
+      function loadLevel(level) {
+        const { nodes, edges } = generateLevel(level);
+        GameState.nodes = nodes;
+        GameState.edges = edges;
+        GameState.visitedNodes.clear();
+        GameState.path = [];
+        GameState.selectedNode = null;
+        updateHUD();
+      }
+
+      // --- ACTUALIZAR HUD ---
+      function updateHUD() {
+        document.getElementById('hud-rank').textContent = GameState.rank;
+        document.getElementById('hud-score').textContent = String(GameState.score).padStart(4, '0');
+        document.getElementById('hud-level').textContent = String(GameState.level).padStart(2, '0');
+      }
+
+      // --- TERMINAL DE LOG ---
+      function sysLog(message) {
+        const logEl = document.getElementById('sys-log');
+        document.getElementById('log-text').textContent = message;
+        logEl.style.display = 'block';
+        setTimeout(() => { logEl.style.display = 'none'; }, 4000);
+      }
+
+      // --- DIBUJO PRINCIPAL ---
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Fondo con efecto matrix
+        ctx.fillStyle = '#0a0c0f';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Dibujar aristas
+        GameState.edges.forEach(edge => {
+          const fromNode = GameState.nodes.find(n => n.id === edge.from);
+          const toNode = GameState.nodes.find(n => n.id === edge.to);
+          if (!fromNode || !toNode) return;
+          
+          ctx.beginPath();
+          ctx.moveTo(fromNode.x, fromNode.y);
+          ctx.lineTo(toNode.x, toNode.y);
+          ctx.strokeStyle = '#00ff4133';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          // Flecha dirigida
+          if (edge.type === 'directed') {
+            const angle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
+            const arrowX = toNode.x - 15 * Math.cos(angle);
+            const arrowY = toNode.y - 15 * Math.sin(angle);
+            ctx.fillStyle = '#00ff41';
+            ctx.beginPath();
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(arrowX - 8 * Math.cos(angle - Math.PI/6), arrowY - 8 * Math.sin(angle - Math.PI/6));
+            ctx.lineTo(arrowX - 8 * Math.cos(angle + Math.PI/6), arrowY - 8 * Math.sin(angle + Math.PI/6));
+            ctx.closePath();
+            ctx.fill();
+          }
+        });
+        
+        // Dibujar camino de infiltración
+        if (GameState.path.length > 1) {
+          ctx.beginPath();
+          ctx.strokeStyle = '#00ff41';
+          ctx.lineWidth = 4;
+          ctx.shadowColor = '#00ff41';
+          ctx.shadowBlur = 10;
+          for (let i = 0; i < GameState.path.length - 1; i++) {
+            const fromNode = GameState.nodes.find(n => n.id === GameState.path[i]);
+            const toNode = GameState.nodes.find(n => n.id === GameState.path[i+1]);
+            if (fromNode && toNode) {
+              ctx.moveTo(fromNode.x, fromNode.y);
+              ctx.lineTo(toNode.x, toNode.y);
+            }
+          }
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+        
+        // Dibujar nodos
+        GameState.nodes.forEach(node => {
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
+          ctx.fillStyle = node.visited ? '#00ff41' : '#1a2a1a';
+          ctx.fill();
+          ctx.strokeStyle = '#00ff41';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 14px "Share Tech Mono"';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(node.id, node.x, node.y);
+        });
+      }
+
+      // --- LÓGICA DE INFILTRACIÓN (HAMILTONIANO) ---
+      function handleNodeClick(nodeId) {
+        if (GameState.mode !== 'play') return;
+        const node = GameState.nodes.find(n => n.id === nodeId);
+        if (!node || node.visited) return;
+        
+        // Verificar adyacencia
+        const lastVisited = GameState.path.length > 0 ? GameState.path[GameState.path.length - 1] : null;
+        if (lastVisited !== null) {
+          const edge = GameState.edges.find(e => e.from === lastVisited && e.to === nodeId);
+          if (!edge) {
+            sysLog('ERROR: Nodo no adyacente. La ruta debe ser contigua.');
+            return;
+          }
+        }
+        
+        // Marcar nodo como visitado y añadir al camino
+        node.visited = true;
+        GameState.visitedNodes.add(nodeId);
+        GameState.path.push(nodeId);
+        GameState.selectedNode = nodeId;
+        
+        // Comprobar victoria
+        if (GameState.visitedNodes.size === GameState.nodes.length) {
+          GameState.score += 1000 * GameState.level;
+          GameState.level++;
+          sysLog(`INFILTRACIÓN EXITOSA. Nivel ${GameState.level - 1} completado. +${1000 * (GameState.level-1)} PI.`);
+          loadLevel(GameState.level);
+        }
+        
+        updateHUD();
+      }
+
+      // --- EVENTOS DE INTERFAZ ---
+      canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+        
+        const clickedNode = GameState.nodes.find(n => Math.hypot(n.x - x, n.y - y) < n.radius + 5);
+        if (clickedNode) {
+          handleNodeClick(clickedNode.id);
+        }
+      });
+
+      // --- CAMBIO DE MODO ---
+      document.getElementById('btn-play').addEventListener('click', () => {
+        GameState.mode = 'play';
+        document.querySelectorAll('.cyber-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-play').classList.add('active');
+        loadLevel(GameState.level);
+        sysLog('Modo INFILTRACIÓN activado. Encuentra el camino hamiltoniano.');
+      });
+
+      document.getElementById('btn-fractal').addEventListener('click', () => {
+        GameState.mode = 'fractal';
+        sysLog('Accediendo a datos fractales... No implementado aún.');
+      });
+
+      // --- INICIO ---
+      loadLevel(1);
+      
+      function gameLoop() {
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+      gameLoop();
+      
+      sysLog('NetHack: Pathfinder v0.1.0 - Iniciando secuencia de infiltración...');
+    })();
+  </script>
+</body>
+</html>
