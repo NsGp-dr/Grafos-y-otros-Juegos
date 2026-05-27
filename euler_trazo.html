@@ -1,191 +1,466 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>EulerTrace — El juego del trazo único</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
-
-:root {
-  --bg:     #0a0c10;
-  --bg2:    #111520;
-  --bg3:    #181d2a;
-  --line:   rgba(255,255,255,0.07);
-  --line2:  rgba(255,255,255,0.14);
-  --ink:    #e8eaf0;
-  --ink2:   #7b8099;
-  --ink3:   #3d4259;
-  --accent: #4fd1c5;   /* teal */
-  --gold:   #f6c94e;
-  --rose:   #f87185;
-  --violet: #a78bfa;
-  --green:  #6ee7b7;
-  --edge-idle:   rgba(99,120,200,0.55);
-  --edge-done:   rgba(79,209,197,0.9);
-  --edge-wrong:  rgba(248,113,133,0.85);
-  --node-idle:   #1e2540;
-  --node-sel:    #4fd1c5;
-  --node-odd:    #f6c94e;
-  --node-even:   #a78bfa;
-  --r: 8px;
-  --mono: 'JetBrains Mono', monospace;
-  --sans: 'Syne', sans-serif;
-}
-
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--sans);touch-action:none}
-
-/* ────────────────────── LAYOUT ────────────────────── */
-#root{display:grid;grid-template-rows:52px 1fr 140px;height:100%;overflow:hidden}
-
-/* ────────────────────── TOP BAR ────────────────────── */
-#bar{display:flex;align-items:center;gap:6px;padding:0 14px;background:var(--bg2);border-bottom:1px solid var(--line);z-index:10}
-#bar .logo{font-size:14px;font-weight:800;letter-spacing:-0.5px;color:var(--accent);white-space:nowrap}
-#bar .dot{width:5px;height:5px;border-radius:50%;background:var(--line2);flex-shrink:0}
-.stat{display:flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11px;color:var(--ink2);white-space:nowrap}
-.stat b{color:var(--ink);font-weight:500}
-#bar .flex{flex:1}
-#btnHelp{background:transparent;border:1px solid var(--line2);color:var(--ink2);font-family:var(--mono);font-size:10px;padding:5px 9px;border-radius:5px;cursor:pointer;letter-spacing:1px}
-
-/* ────────────────────── CANVAS ────────────────────── */
-#cvWrap{position:relative;overflow:hidden;background:var(--bg)}
-canvas#cv{display:block;width:100%;height:100%;cursor:crosshair}
-
-/* ────────────────────── HINT BANNER ────────────────────── */
-#hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(15,18,28,0.9);border:1px solid var(--line2);border-radius:20px;padding:6px 16px;font-family:var(--mono);font-size:11px;color:var(--ink2);pointer-events:none;white-space:nowrap;transition:opacity .3s}
-#hint.hide{opacity:0}
-
-/* score pop */
-.pop{position:absolute;font-family:var(--mono);font-size:16px;font-weight:500;pointer-events:none;animation:popUp 1s ease forwards}
-@keyframes popUp{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-48px);opacity:0}}
-
-/* ────────────────────── BOTTOM PANEL ────────────────────── */
-#bottom{background:var(--bg2);border-top:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
-.tabs{display:flex;flex-shrink:0;border-bottom:1px solid var(--line)}
-.tab{flex:1;background:none;border:none;padding:9px 4px;font-family:var(--mono);font-size:9px;letter-spacing:1.5px;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;text-transform:uppercase;transition:color .15s}
-.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
-.pane{display:none;flex:1;overflow-y:auto;overflow-x:hidden}
-.pane.on{display:block}
-
-/* LEVEL pane */
-#pLevel{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
-.lv-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.lv-card{background:var(--bg3);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;font-size:11px}
-.lv-card .lc-title{font-family:var(--mono);font-size:9px;letter-spacing:1.5px;color:var(--ink3);margin-bottom:4px;text-transform:uppercase}
-.lv-card .lc-val{font-size:14px;font-weight:700;color:var(--accent)}
-.lv-card .lc-sub{font-size:10px;color:var(--ink2);font-family:var(--mono);margin-top:2px}
-.lv-info{background:var(--bg3);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;font-size:11px;line-height:1.65;color:var(--ink2);font-family:var(--mono)}
-.lv-info strong{color:var(--ink)}
-.deg-bar{display:flex;gap:5px;flex-wrap:wrap}
-.deg-chip{font-family:var(--mono);font-size:10px;padding:3px 7px;border-radius:4px;border:1px solid}
-
-/* THEORY pane */
-#pTheory{padding:10px 12px}
-.th-block{background:var(--bg3);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;margin-bottom:7px;font-size:11px;line-height:1.7;color:var(--ink2);font-family:var(--mono)}
-.th-block .th-title{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:5px;font-family:var(--sans)}
-.th-block .formula{display:block;margin:5px 0;color:var(--violet);padding:4px 8px;background:rgba(167,139,250,0.08);border-radius:4px}
-.th-block code{color:var(--gold);background:rgba(246,201,78,0.1);padding:1px 4px;border-radius:3px}
-
-/* ────────────────────── OVERLAY ────────────────────── */
-#overlay{display:none;position:absolute;inset:0;background:rgba(10,12,16,0.92);z-index:40;align-items:center;justify-content:center;padding:16px}
-#overlay.show{display:flex}
-#oCard{background:var(--bg2);border:1px solid var(--line2);border-radius:14px;width:100%;max-width:340px;padding:20px 18px 22px;text-align:center}
-#oCard .oicon{font-size:36px;margin-bottom:10px}
-#oCard h2{font-size:18px;font-weight:800;color:var(--ink);margin-bottom:6px}
-#oCard p{font-size:12px;font-family:var(--mono);color:var(--ink2);line-height:1.7;margin-bottom:14px}
-#oCard .obig{font-size:26px;font-weight:800;color:var(--gold);margin:6px 0}
-.obtn{display:block;width:100%;margin-top:8px;padding:11px;border-radius:var(--r);font-family:var(--mono);font-size:12px;cursor:pointer;letter-spacing:1px;border:1px solid}
-.obtn.primary{background:rgba(79,209,197,0.12);border-color:var(--accent);color:var(--accent)}
-.obtn.secondary{background:transparent;border-color:var(--line2);color:var(--ink2)}
-.obtn:active{transform:scale(0.98)}
-
-/* HELP modal */
-#helpModal{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;padding:12px}
-#helpModal.show{display:flex}
-#hBox{background:var(--bg2);border:1px solid var(--line2);border-radius:14px;width:100%;max-width:340px;max-height:86vh;overflow-y:auto}
-#hBox h2{padding:14px 16px 10px;font-size:15px;font-weight:800;color:var(--accent);border-bottom:1px solid var(--line)}
-.hSection{padding:12px 16px;border-bottom:1px solid var(--line);font-size:11px;font-family:var(--mono);line-height:1.75;color:var(--ink2)}
-.hSection h3{font-size:11px;font-weight:500;color:var(--violet);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;font-family:var(--mono)}
-.hSection strong,.hSection b{color:var(--ink)}
-.hl{background:rgba(79,209,197,0.08);border-left:2px solid var(--accent);padding:6px 10px;border-radius:0 4px 4px 0;margin:6px 0;color:var(--accent)}
-#btnCloseHelp{display:block;width:calc(100% - 32px);margin:12px 16px;padding:10px;background:transparent;border:1px solid var(--line2);border-radius:var(--r);color:var(--ink2);font-family:var(--mono);font-size:11px;cursor:pointer}
-
-/* scrollbar */
-::-webkit-scrollbar{width:3px}
-::-webkit-scrollbar-thumb{background:var(--line2);border-radius:2px}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puentes de Königsberg - El desafío de Euler</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(145deg, #f5f0e7 0%, #e8dfd3 100%);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .game-container {
+            max-width: 1100px;
+            width: 100%;
+            background: #fffef7;
+            border-radius: 48px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.05);
+            overflow: hidden;
+            padding: 20px 30px 30px 30px;
+            transition: all 0.2s;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2rem;
+            margin: 0 0 5px 0;
+            color: #2c3e2f;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+        .subtitulo {
+            text-align: center;
+            color: #5a6e4a;
+            font-style: italic;
+            margin-bottom: 20px;
+            border-bottom: 2px dashed #cdb28b;
+            display: inline-block;
+            width: auto;
+            margin-left: auto;
+            margin-right: auto;
+            padding-bottom: 8px;
+        }
+        .cuento {
+            background: #fef3e2;
+            border-left: 8px solid #b97f44;
+            padding: 12px 20px;
+            margin: 15px 0 20px 0;
+            border-radius: 24px;
+            font-size: 0.95rem;
+            color: #3a2a1f;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .flex-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+        .grafico-area {
+            flex: 1.2;
+            min-width: 280px;
+            background: #fef7e8;
+            border-radius: 36px;
+            padding: 15px;
+            box-shadow: inset 0 0 0 1px #f0e3d0, 0 8px 20px rgba(0,0,0,0.1);
+        }
+        .matriz-area {
+            flex: 1;
+            min-width: 320px;
+            background: #fef7e8;
+            border-radius: 36px;
+            padding: 15px;
+            box-shadow: inset 0 0 0 1px #f0e3d0, 0 8px 20px rgba(0,0,0,0.1);
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: #fff9ef;
+            border-radius: 28px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 100%;
+            height: auto;
+            cursor: pointer;
+        }
+        table {
+            margin: 10px auto;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #cdba9a;
+            padding: 8px 12px;
+            text-align: center;
+            font-weight: 500;
+        }
+        th {
+            background: #d9c5a7;
+            color: #2d3b2a;
+        }
+        input {
+            width: 55px;
+            padding: 6px;
+            text-align: center;
+            font-size: 1rem;
+            border-radius: 16px;
+            border: 1px solid #bc9a6b;
+            background: #fffdf9;
+            font-weight: bold;
+        }
+        button {
+            background: #7c5e3a;
+            border: none;
+            color: white;
+            font-weight: bold;
+            padding: 10px 18px;
+            margin: 8px 8px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: 0.15s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        button:hover {
+            background: #5e4529;
+            transform: scale(0.97);
+        }
+        .mensaje {
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-align: center;
+            background: #f5e7d3;
+            padding: 12px;
+            border-radius: 48px;
+            margin-top: 20px;
+        }
+        .leyenda {
+            font-size: 0.8rem;
+            text-align: center;
+            color: #6a5a48;
+            margin-top: 15px;
+        }
+        footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.75rem;
+            color: #9b8a70;
+        }
+        .badge-euler {
+            background: #2c3e2f;
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 40px;
+            color: #f5e2b6;
+            font-size: 0.7rem;
+            margin-bottom: 8px;
+        }
+        @media (max-width: 800px) {
+            .game-container { padding: 15px; }
+            input { width: 45px; }
+        }
+    </style>
 </head>
 <body>
-<div id="root">
-
-  <!-- TOP BAR -->
-  <div id="bar">
-    <span class="logo">◈ EULER·TRAZO</span>
-    <div class="dot"></div>
-    <div class="stat">N<b id="hLvl">1</b></div>
-    <div class="stat">★<b id="hPts">0</b></div>
-    <div class="stat">×<b id="hCombo">1</b></div>
-    <div class="flex"></div>
-    <button id="btnHelp" onclick="openHelp()">? AYUDA</button>
-  </div>
-
-  <!-- GRAPH CANVAS -->
-  <div id="cvWrap">
-    <canvas id="cv"></canvas>
-    <div id="hint">Toca un nodo para empezar</div>
-    <!-- overlays injected here -->
-  </div>
-
-  <!-- BOTTOM PANEL -->
-  <div id="bottom">
-    <div class="tabs">
-      <button class="tab on" data-tab="level" onclick="swTab(this)">NIVEL</button>
-      <button class="tab" data-tab="theory" onclick="swTab(this)">TEORÍA</button>
+<div class="game-container">
+    <div class="badge-euler">✧ LEONHARD EULER, 1736 ✧</div>
+    <h1>🌉 LOS SIETE PUENTES DE KÖNIGSBERG</h1>
+    <div style="text-align: center;">
+        <span class="subtitulo">"El paseo imposible" — Un desafío de teoría de grafos</span>
     </div>
-    <div class="pane on" id="pLevel"></div>
-    <div class="pane" id="pTheory"></div>
-  </div>
+
+    <!-- Cuento corto y moraleja -->
+    <div class="cuento">
+        🧙‍♂️ <strong>El cuento del paseante obstinado:</strong> Durante siglos, los habitantes de Königsberg intentaron sin éxito recorrer los siete puentes sin repetir ninguno y volver al inicio. Hasta que Euler entendió que no era falta de ingenio, sino <strong>la estructura del grafo</strong> lo que hacía imposible el recorrido. <br>
+        🧠 <strong>Moraleja:</strong> <em>“Antes de buscar una solución, asegúrate de que el problema la permita. Las matemáticas discretas te dan el mapa.”</em>
+    </div>
+
+    <div class="flex-layout">
+        <!-- Zona del mapa de Königsberg -->
+        <div class="grafico-area">
+            <h3 style="text-align:center; margin:0 0 10px 0;">🗺️ Mapa de Königsberg (1736)</h3>
+            <canvas id="konigsbergCanvas" width="450" height="300" style="width:100%; height:auto; max-width:450px; aspect-ratio:450/300"></canvas>
+            <div class="leyenda">
+                🔵 <strong>Tierras (vértices):</strong> A = Ribera Norte &nbsp;|&nbsp; B = Ribera Sur &nbsp;|&nbsp; C = Isla Kneiphof &nbsp;|&nbsp; D = Tierra Este<br>
+                🟤 <strong>Puentes (aristas):</strong> 7 conexiones (2 entre A-C, 2 entre B-C, 1 entre A-B, 1 entre C-D, 1 entre A-D)
+            </div>
+        </div>
+
+        <!-- Matriz de adyacencia interactiva -->
+        <div class="matriz-area">
+            <h3 style="text-align:center; margin:0 0 10px 0;">📊 Matriz de Adyacencia (4x4)</h3>
+            <p style="font-size:0.85rem; text-align:center;">Completa con <strong>0, 1 o 2</strong> (multigrafo: número de puentes entre tierras)</p>
+            <div id="matrizDinamica" style="overflow-x: auto;"></div>
+            <div style="text-align: center; margin-top: 15px;">
+                <button id="btnVerificar">🔍 VERIFICAR MATRIZ</button>
+                <button id="btnReiniciar">🔄 NUEVA MATRIZ (vaciar)</button>
+                <button id="btnMostrarSolucion">📜 MOSTRAR SOLUCIÓN (Euler)</button>
+            </div>
+            <div id="mensajeResultado" class="mensaje">
+                ⚡ Completa la matriz y verifica...
+            </div>
+        </div>
+    </div>
+
+    <!-- explicación grados y moraleja -->
+    <footer>
+        💡 <strong>Concepto clave:</strong> En un grafo, el <strong>grado</strong> de un vértice es el número de puentes que conectan esa tierra.<br>
+        🌟 <strong>Teorema de Euler (Handshaking lemma):</strong> Si más de dos vértices tienen grado impar, NO existe un circuito euleriano (recorrido que use cada arista exactamente una vez y vuelva al inicio).<br>
+        🎯 <strong>Este grafo tiene 4 vértices de grado impar → Imposible.</strong>
+    </footer>
 </div>
 
-<!-- WIN / FAIL OVERLAY -->
-<div id="overlay">
-  <div id="oCard">
-    <div class="oicon" id="oIcon"></div>
-    <h2 id="oTitle"></h2>
-    <p id="oMsg"></p>
-    <div class="obig" id="oPts"></div>
-    <button class="obtn primary" id="oBtnMain" onclick="overlayMain()"></button>
-    <button class="obtn secondary" onclick="resetLevel()">Reintentar</button>
-  </div>
-</div>
-
-<!-- HELP MODAL -->
-<div id="helpModal">
-  <div id="hBox">
-    <h2>◈ Cómo jugar</h2>
-    <div class="hSection">
-      <h3>El objetivo</h3>
-      Traza <strong>todas las aristas</strong> del grafo con un solo dedo, <strong>sin levantar</strong> y <strong>sin repetir</strong> ninguna arista. Es el problema de Euler de 1736 convertido en juego.
-    </div>
-    <div class="hSection">
-      <h3>Controles</h3>
-      <ul style="padding-left:14px">
-        <li><b>Toca un nodo</b> para empezar o continuar desde él.</li>
-        <li><b>Desliza hasta otro nodo</b> conectado para trazar la arista.</li>
-        <li>Las aristas ya trazadas se bloquean — no puedes repetirlas.</li>
-        <li><b>Toca "Reintentar"</b> si te atascas.</li>
-      </ul>
-    </div>
-    <div class="hSection">
-      <h3>Clave para ganar</h3>
-      <div class="hl">Un grafo tiene camino euleriano ↔ tiene exactamente 0 ó 2 nodos de grado impar.</div>
-      <b>Nodo amarillo</b> = grado impar → es donde debes empezar o terminar.<br>
-      <b>Nodo violeta</b> = grado par → puedes pasar por él sin problemas.
-    </div>
-    <div class="hSection">
-      <h3>Puntos</h3>
-      Cada arista: <b style="color:var(--gold)">+10 × combo</b>. Combo sube con aristas consecutivas. Nivel completo: <b style="color:var(--gold)">+500 bonus</b>. Callejón sin salida: combo se resetea.
+<script>
+    // DEFINICIÓN DEL GRAFO REAL DE KÖNIGSBERG (multigrafo)
+    // Vértices: 0->A (Norte), 1->B (Sur), 2->C (Isla), 3->D (Este)
+    // Matriz de adyacencia REAL (con multi-aristas)
+    const REAL_ADY = [
+        [0, 1, 2, 1],   // A: conecta con B (1 puente), con C (2 puentes), con D (1 puente)
+        [1, 0, 2, 0],   // B: conecta con A (1), con C (2), con D (0)
+        [2, 2, 0, 1],   // C: conecta con A(2), con B(2), con D(1)
+        [1, 0, 1, 0]    // D: conecta con A(1), con B(0), con C(1)
+    ];
+    
+    const NOMBRES = ['A (Norte)', 'B (Sur)', 'C (Isla)', 'D (Este)'];
+    const LETRAS = ['A', 'B', 'C', 'D'];
+    
+    let canvas = document.getElementById('konigsbergCanvas');
+    let ctx = canvas.getContext('2d');
+    
+    // Dibujar el mapa de Königsberg (estilo histórico)
+    function dibujarMapaKonigsberg() {
+        if (!ctx) return;
+        const w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        
+        // fondo suave
+        ctx.fillStyle = '#fff9ef';
+        ctx.fillRect(0, 0, w, h);
+        
+        // Ríos: dos brazos del Pregel
+        ctx.beginPath();
+        ctx.moveTo(20, 130);
+        ctx.quadraticCurveTo(100, 110, 180, 140);
+        ctx.quadraticCurveTo(250, 170, 320, 130);
+        ctx.quadraticCurveTo(380, 100, 430, 120);
+        ctx.lineTo(430, 160);
+        ctx.quadraticCurveTo(370, 150, 300, 190);
+        ctx.quadraticCurveTo(230, 220, 150, 200);
+        ctx.quadraticCurveTo(70, 180, 20, 170);
+        ctx.fillStyle = '#bdd4e7';
+        ctx.fill();
+        ctx.fillStyle = '#8aaec0';
+        ctx.font = "italic 12px 'Segoe UI'";
+        ctx.fillText("Río Pregel", 70, 160);
+        
+        // Dibujar aristas (puentes) con estilo
+        // coordenadas de vértices (x,y) para A,B,C,D
+        const coords = [
+            {x: 70, y: 70},   // A Norte
+            {x: 70, y: 230},  // B Sur
+            {x: 270, y: 150}, // C Isla
+            {x: 390, y: 75}   // D Este
+        ];
+        
+        // lista de pares con multiplicidad: (desde, hasta, cantidad)
+        const puentes = [
+            [0,1,1], [0,2,2], [0,3,1],
+            [1,2,2], [2,3,1]
+        ];
+        
+        // dibujar aristas múltiples con curvas
+        for (let puente of puentes) {
+            let u = puente[0], v = puente[1], mult = puente[2];
+            let x1 = coords[u].x, y1 = coords[u].y;
+            let x2 = coords[v].x, y2 = coords[v].y;
+            let dx = x2 - x1, dy = y2 - y1;
+            let len = Math.hypot(dx, dy);
+            let offset = 12;
+            
+            for (let i = 0; i < mult; i++) {
+                ctx.beginPath();
+                let offsetX = 0, offsetY = 0;
+                if (mult > 1) {
+                    let perpX = -dy / len * offset * (i - (mult-1)/2);
+                    let perpY = dx / len * offset * (i - (mult-1)/2);
+                    ctx.moveTo(x1 + perpX*0.2, y1 + perpY*0.2);
+                    ctx.quadraticCurveTo((x1+x2)/2 + perpX, (y1+y2)/2 + perpY, x2 + perpX*0.2, y2 + perpY*0.2);
+                } else {
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                }
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#9c6e42';
+                ctx.stroke();
+            }
+        }
+        
+        // dibujar vértices (tierras)
+        const coloresTierra = ['#6f9e6f', '#6f9e6f', '#b5a06e', '#b59a6e'];
+        for (let i = 0; i < coords.length; i++) {
+            ctx.beginPath();
+            ctx.arc(coords[i].x, coords[i].y, 22, 0, 2*Math.PI);
+            ctx.fillStyle = coloresTierra[i];
+            ctx.fill();
+            ctx.strokeStyle = '#3b2a1f';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = '#1e2a1a';
+            ctx.font = "bold 18px 'Segoe UI'";
+            ctx.fillText(LETRAS[i], coords[i].x-8, coords[i].y+7);
+            ctx.fillStyle = '#faf0dd';
+            ctx.font = "bold 12px 'Segoe UI'";
+            ctx.fillText(NOMBRES[i].substring(0,2), coords[i].x-15, coords[i].y-12);
+        }
+    }
+    
+    // Generar inputs de matriz dinámica
+    function generarInputsMatriz() {
+        const container = document.getElementById('matrizDinamica');
+        let html = '<table>';
+        html += '<tr><th></th><th>A</th><th>B</th><th>C</th><th>D</th></tr>';
+        for (let i = 0; i < 4; i++) {
+            html += `<tr><th>${LETRAS[i]}</th>`;
+            for (let j = 0; j < 4; j++) {
+                let valorInicial = '';
+                html += `<td><input type="number" id="cell_${i}_${j}" min="0" max="2" step="1" value="0" style="width:55px;"></td>`;
+            }
+            html += '</tr>';
+        }
+        html += '</table><p style="font-size:12px; text-align:center;">🔹 Nota: Solo números enteros 0,1,2 (para grafo múltiple)</p>';
+        container.innerHTML = html;
+    }
+    
+    // Obtener matriz ingresada por el usuario
+    function obtenerMatrizUsuario() {
+        let mat = Array(4).fill().map(() => Array(4).fill(0));
+        for (let i=0; i<4; i++) {
+            for (let j=0; j<4; j++) {
+                let val = parseInt(document.getElementById(`cell_${i}_${j}`).value);
+                if (isNaN(val)) val = 0;
+                if (val<0) val=0;
+                if (val>2) val=2;
+                mat[i][j] = val;
+            }
+        }
+        return mat;
+    }
+    
+    // Verificar simetría y grados (mostrar error y comparar)
+    function verificarMatriz() {
+        let usuario = obtenerMatrizUsuario();
+        let errores = [];
+        // 1. ver simetría
+        for (let i=0; i<4; i++) {
+            for (let j=i+1; j<4; j++) {
+                if (usuario[i][j] !== usuario[j][i]) {
+                    errores.push(`❌ No es simétrica: [${LETRAS[i]}][${LETRAS[j]}] = ${usuario[i][j]} pero [${LETRAS[j]}][${LETRAS[i]}] = ${usuario[j][i]}. La matriz debe ser simétrica.`);
+                }
+            }
+        }
+        // 2. comparar con la real
+        let igualReal = true;
+        for (let i=0; i<4; i++) {
+            for (let j=0; j<4; j++) {
+                if (usuario[i][j] !== REAL_ADY[i][j]) {
+                    igualReal = false;
+                    break;
+                }
+            }
+        }
+        if (!igualReal && errores.length===0) {
+            errores.push(`⚠️ La matriz no corresponde al grafo histórico de Königsberg. Revisa los puentes entre tierras.`);
+        }
+        
+        // Calcular grados (suma filas)
+        let grados = [];
+        for (let i=0; i<4; i++) {
+            let suma = 0;
+            for (let j=0; j<4; j++) suma += usuario[i][j];
+            grados.push(suma);
+        }
+        let impares = grados.filter(g => g % 2 === 1).length;
+        
+        let msgDiv = document.getElementById('mensajeResultado');
+        if (errores.length === 0 && igualReal) {
+            msgDiv.innerHTML = `✅ ¡CORRECTO! Matriz idéntica a la de Königsberg. <br> 📊 Grados: ${grados.join(', ')}. <br> 🧮 Vértices con grado impar: ${impares}. <br> 🚫 Como hay ${impares} (más de 2), es IMPOSIBLE un recorrido que cruce cada puente una sola vez y regrese al inicio. ¡Euler tenía razón! 🎩`;
+            msgDiv.style.background = "#cfe9cd";
+            msgDiv.style.color = "#1f4f1a";
+        } else if (igualReal) {
+            msgDiv.innerHTML = `✅ ¡La matriz es la correcta! Grados: ${grados.join(', ')}. IMPOSIBLE el paseo. Moraleja: entender la estructura antes de insistir.`;
+            msgDiv.style.background = "#cfe9cd";
+        } else {
+            msgDiv.innerHTML = `❌ ${errores.join(' ')} <br> 🔍 Vuelve a contar los puentes del mapa. Recuerda: entre A y C hay 2 puentes, entre B y C hay 2, etc. Matriz simétrica y con 0,1,2.`;
+            msgDiv.style.background = "#f3cfc3";
+            msgDiv.style.color = "#632c1a";
+        }
+        // resaltar visual inputs
+        for (let i=0;i<4;i++){
+            for(let j=0;j<4;j++){
+                let inputEl = document.getElementById(`cell_${i}_${j}`);
+                if(usuario[i][j] === REAL_ADY[i][j]){
+                    inputEl.style.backgroundColor = "#e3f0da";
+                } else {
+                    inputEl.style.backgroundColor = "#ffe0cc";
+                }
+            }
+        }
+    }
+    
+    function reiniciarMatriz() {
+        for (let i=0;i<4;i++) {
+            for (let j=0;j<4;j++) {
+                let inp = document.getElementById(`cell_${i}_${j}`);
+                if(inp) inp.value = "0";
+                if(inp) inp.style.backgroundColor = "";
+            }
+        }
+        document.getElementById('mensajeResultado').innerHTML = "🧽 Matriz reiniciada. Intenta construir la adyacencia según el mapa.";
+        document.getElementById('mensajeResultado').style.background = "#f5e7d3";
+        document.getElementById('mensajeResultado').style.color = "#2c2b26";
+    }
+    
+    function mostrarSolucionEuler() {
+        for (let i=0;i<4;i++) {
+            for (let j=0;j<4;j++) {
+                let inp = document.getElementById(`cell_${i}_${j}`);
+                if(inp) inp.value = REAL_ADY[i][j];
+                if(inp) inp.style.backgroundColor = "#fcf8e8";
+            }
+        }
+        let gradosSol = [];
+        for(let i=0;i<4;i++) {
+            let s = 0;
+            for(let j=0;j<4;j++) s+=REAL_ADY[i][j];
+            gradosSol.push(s);
+        }
+        document.getElementById('mensajeResultado').innerHTML = `📜 SOLUCIÓN DE EULER: matriz de adyacencia real.<br> Grados: ${gradosSol.join(', ')}. <br> ✨ Como hay 4 vértices de grado impar, no existe un circuito euleriano. ¡El paseo imposible explicado!`;
+        document.getElementById('mensajeResultado').style.background = "#d9d2bc";
+    }
+    
+    // Inicializar todo
+    window.onload = () => {
+        dibujarMapaKonigsberg();
+        generarInputsMatriz();
+        document.getElementById('btnVerificar').addEventListener('click', verificarMatriz);
+        document.getElementById('btnReiniciar').addEventListener('click', reiniciarMatriz);
+        document.getElementById('btnMostrarSolucion').addEventListener('click', mostrarSolucionEuler);
+        // re-dibujar si cambia tamaño (simple)
+        window.addEventListener('resize', () => dibujarMapaKonigsberg());
+    };
+</script>
+</body>
+</html>onus</b>. Callejón sin salida: combo se resetea.
     </div>
     <div class="hSection">
       <h3>Niveles</h3>
